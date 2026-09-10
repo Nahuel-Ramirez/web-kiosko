@@ -1,0 +1,18 @@
+# Frontend (Node/React)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# Backend (Python/FastAPI)
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.venv/
+backend/venv/
+backend/.env
+backend/*.pyc
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

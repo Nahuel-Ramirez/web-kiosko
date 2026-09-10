@@ -32,6 +32,51 @@ Actualización masiva de precios, facturación electrónica (AFIP), cobro digita
 | Backend | Python + FastAPI |
 | Base de datos | PostgreSQL |
 
+## Estructura de carpetas
+
+Monorepo: frontend y backend viven en carpetas separadas para no mezclar dependencias de Node con las de Python.
+
+```
+web-kiosko/
+├── README.md
+├── .gitignore
+├── docs/                        # guías del proyecto, historias de usuario
+│
+├── frontend/                    # React
+│   ├── package.json
+│   ├── .env.example
+│   ├── public/
+│   └── src/
+│       ├── assets/              # imágenes, íconos, estilos globales
+│       ├── components/          # componentes reutilizables (Boton, Modal, Navbar)
+│       ├── pages/                # una carpeta o archivo por pantalla (Login, POS, Inventario)
+│       ├── routes/               # definición de rutas y Protected Routes
+│       ├── services/             # llamadas a la API (axios/fetch), un archivo por recurso
+│       ├── context/              # estado global (sesión/auth, carrito)
+│       ├── hooks/                # hooks propios reutilizables
+│       ├── App.jsx
+│       └── main.jsx
+│
+├── backend/                     # Python + FastAPI
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── app/
+│       ├── main.py               # arranque de la app FastAPI
+│       ├── core/                 # configuración, seguridad, JWT
+│       ├── db/                   # conexión y sesión de PostgreSQL
+│       ├── models/               # modelos SQLAlchemy (una tabla = un archivo)
+│       ├── schemas/              # esquemas Pydantic (validación de entrada/salida)
+│       ├── routers/              # endpoints agrupados por recurso: auth, productos,
+│       │                         #   clientes, ventas, cajas, reportes
+│       ├── services/             # lógica de negocio (no debe ir en los routers)
+│       └── tests/                # tests automáticos (pytest)
+│
+└── database/
+    └── init.sql                  # script de creación de tablas / seed inicial
+```
+
+Detalle de qué va en cada carpeta y la rutina diaria de trabajo (comandos, convenciones, quién revisa qué) están en `Rutina_Diaria_y_Estructura_Web_Kiosko.docx`, en la carpeta del proyecto.
+
 ## Modelo de datos (resumen)
 
 `usuarios`, `productos`, `clientes`, `cierres_caja`, `ventas`, `detalle_ventas` — el detalle completo de columnas y restricciones está en la guía de desarrollo del proyecto.
