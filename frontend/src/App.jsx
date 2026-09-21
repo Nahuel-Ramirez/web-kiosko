@@ -8,11 +8,17 @@ import { Admin } from './components/Admin';
 import { Caja } from './components/Caja';
 import { Reportes } from './components/Reportes';
 
-const DEMO_MODE = true;
+// En true muestra LoginVisual (mockup sin backend). En false usa el login
+// real, conectado a la API (ver src/services/authService.js).
+const DEMO_MODE = false;
 
 function AppContent() {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const { activePanel, setActivePanel } = useApp();
+
+  if (loading) {
+    return null;
+  }
 
   if (!currentUser) {
     return DEMO_MODE ? <LoginVisual /> : <Login />;

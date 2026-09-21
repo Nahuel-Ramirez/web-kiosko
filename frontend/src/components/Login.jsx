@@ -1,30 +1,29 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-export function Login() {
-  const { selectedRole, setSelectedRole, login } = useAuth();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('1234');
-  const [error, setError] = useState('');
+// Credenciales de los usuarios sembrados por backend/app/db/seed.py
+const USUARIOS_DEMO = {
+  admin: { username: 'admin', password: 'admin123' },
+  cajero: { username: 'cajero', password: 'cajero123' },
+};
 
-  const handleSubmit = (e) => {
+export function Login() {
+  const { selectedRole, setSelectedRole, login, authError } = useAuth();
+  const [username, setUsername] = useState(USUARIOS_DEMO.admin.username);
+  const [password, setPassword] = useState(USUARIOS_DEMO.admin.password);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    if (login(username.trim(), password.trim())) {
-      return;
-    }
-    setError('Credenciales invalidas.');
+    setSubmitting(true);
+    await login(username.trim(), password.trim());
+    setSubmitting(false);
   };
 
   const handleRoleChange = (role) => {
     setSelectedRole(role);
-    setUsername(users[role].username);
-    setPassword(users[role].password);
-  };
-
-  const users = {
-    admin: { username: 'admin', password: '1234' },
-    cajero: { username: 'cajero', password: '1234' }
+    setUsername(USUARIOS_DEMO[role].username);
+    setPassword(USUARIOS_DEMO[role].password);
   };
 
   return (
@@ -41,12 +40,14 @@ export function Login() {
             <h2>Iniciar sesion</h2>
             <div className="role-toggle">
               <button
+                type="button"
                 className={`role-btn ${selectedRole === 'admin' ? 'active' : ''}`}
                 onClick={() => handleRoleChange('admin')}
               >
                 Administrador
               </button>
               <button
+                type="button"
                 className={`role-btn ${selectedRole === 'cajero' ? 'active' : ''}`}
                 onClick={() => handleRoleChange('cajero')}
               >
@@ -55,7 +56,11 @@ export function Login() {
             </div>
 
             <form id="loginForm" onSubmit={handleSubmit}>
-              {error && <div className="empty-state" style={{ background: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' }}>{error}</div>}
+              {authError && (
+                <div className="empty-state" style={{ background: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' }}>
+                  {authError}
+                </div>
+              )}
               <label>
                 Usuario
                 <input
@@ -78,13 +83,15 @@ export function Login() {
                   required
                 />
               </label>
-              <button type="submit" className="primary-btn full">Ingresar</button>
+              <button type="submit" className="primary-btn full" disabled={submitting}>
+                {submitting ? 'Ingresando...' : 'Ingresar'}
+              </button>
             </form>
 
             <div className="demo-box">
-              <strong>Demo rapida</strong>
-              <span>Admin: admin / 1234</span>
-              <span>Cajero: cajero / 1234</span>
+              <strong>Usuarios de prueba (backend)</strong>
+              <span>Admin: admin / admin123</span>
+              <span>Cajero: cajero / cajero123</span>
             </div>
           </div>
         </div>

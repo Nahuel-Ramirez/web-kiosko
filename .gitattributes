@@ -1,0 +1,5 @@
+# Normaliza los saltos de línea: git guarda LF en el repo y cada uno los ve
+# con el estilo de su sistema operativo al hacer checkout. Sin esto, en
+# Windows cada `git status` muestra como "modificado" casi todo el repo
+# aunque nadie haya tocado nada.
+* text=auto
