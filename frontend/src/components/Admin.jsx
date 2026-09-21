@@ -13,42 +13,46 @@ export function Admin() {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    category: '',
     cost: '',
     price: '',
     stock: ''
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleChange = (e) => {
-    setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (error) setError('');
+    if (success) setSuccess('');
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
-    const { name, code, category, cost, price, stock } = formData;
-    if (!name.trim() || !code.trim() || !category.trim() || !cost || !price || !stock) {
-      setError('Complete todos los campos.');
+    const { name, code, cost, price, stock } = formData;
+    if (!name.trim() || !code.trim() || !cost || !price || !stock) {
+      setError('Complete todos los campos obligatorios.');
       return;
     }
 
     if (products.some(item => item.code === code.trim())) {
-      setError('Ya existe un producto con ese codigo.');
+      setError('Ya existe un producto con ese código de barras.');
       return;
     }
 
     addProduct({
       name: name.trim(),
       code: code.trim(),
-      category: category.trim(),
       cost: Number(cost),
       price: Number(price),
       stock: Number(stock)
     });
 
-    setFormData({ name: '', code: '', category: '', cost: '', price: '', stock: '' });
+    setSuccess('Producto agregado correctamente.');
+    setFormData({ name: '', code: '', cost: '', price: '', stock: '' });
   };
 
   return (
@@ -59,84 +63,81 @@ export function Admin() {
             <h3>Agregar producto</h3>
           </div>
           <form id="productForm" className="product-form" onSubmit={handleSubmit}>
-            {error && <div className="empty-state" style={{ background: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' }}>{error}</div>}
-            
-            <div className="field-row">
-              <label htmlFor="prodName">
-                Nombre
-                <input
-                  type="text"
-                  id="prodName"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                />
-              </label>
+            {error && <div className="form-message error">{error}</div>}
+            {success && <div className="form-message success">{success}</div>}
+
+            <div className="form-field">
+              <label htmlFor="prodName">Nombre del producto <span className="required">*</span></label>
+              <input
+                type="text"
+                id="prodName"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Ej: Coca Cola 600ml"
+                required
+                autoComplete="off"
+              />
             </div>
 
-            <div className="field-row two-fields">
-              <label htmlFor="prodCode">
-                Codigo
-                <input
-                  type="text"
-                  id="prodCode"
-                  value={formData.code}
-                  onChange={handleChange}
-                  required
-                />
-              </label>
-              <label htmlFor="prodCategory">
-                Categoria
-                <input
-                  type="text"
-                  id="prodCategory"
-                  value={formData.category}
-                  onChange={handleChange}
-                  required
-                />
-              </label>
+            <div className="form-field">
+              <label htmlFor="prodCode">Código de barras <span className="required">*</span></label>
+              <input
+                type="text"
+                id="prodCode"
+                name="code"
+                value={formData.code}
+                onChange={handleChange}
+                placeholder="Ej: 750123456789"
+                required
+                autoComplete="off"
+              />
             </div>
 
-            <div className="field-row two-fields">
-              <label htmlFor="prodCost">
-                Costo
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="prodCost">Precio de costo ($) <span className="required">*</span></label>
                 <input
                   type="number"
                   id="prodCost"
+                  name="cost"
                   min="0"
                   step="0.01"
                   value={formData.cost}
                   onChange={handleChange}
+                  placeholder="0.00"
                   required
                 />
-              </label>
-              <label htmlFor="prodPrice">
-                Precio
+              </div>
+              <div className="form-field">
+                <label htmlFor="prodPrice">Precio de venta ($) <span className="required">*</span></label>
                 <input
                   type="number"
                   id="prodPrice"
+                  name="price"
                   min="0"
                   step="0.01"
                   value={formData.price}
                   onChange={handleChange}
+                  placeholder="0.00"
                   required
                 />
-              </label>
+              </div>
             </div>
 
-            <div className="field-row two-fields">
-              <label htmlFor="prodStock">
-                Stock
-                <input
-                  type="number"
-                  id="prodStock"
-                  min="0"
-                  step="1"
-                  value={formData.stock}
-                  onChange={handleChange}
-                  required
-                />
-              </label>
+            <div className="form-field">
+              <label htmlFor="prodStock">Stock inicial <span className="required">*</span></label>
+              <input
+                type="number"
+                id="prodStock"
+                name="stock"
+                min="0"
+                step="1"
+                value={formData.stock}
+                onChange={handleChange}
+                placeholder="0"
+                required
+              />
             </div>
 
             <button type="submit" className="primary-btn full">Guardar producto</button>
@@ -146,61 +147,79 @@ export function Admin() {
         <div className="card">
           <div className="card-header">
             <h3>Inventario</h3>
+            <span className="badge">{products.length} productos</span>
           </div>
-          <table className="inventory-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Stock</th>
-                <th>Precio</th>
-                <th>Accion</th>
-              </tr>
-            </thead>
-            <tbody id="inventoryTable">
-              {products.map(product => (
-                <tr key={product.id}>
-                  <td>
-                    <strong>{product.name}</strong><br />
-                    <small>{product.code}</small>
-                  </td>
-                  <td>
-                    <div className="stock-controls">
-                      <button
-                        className="mini-btn"
-                        onClick={() => updateStock(product.id, -1)}
-                        disabled={product.stock <= 0}
-                      >-</button>
-                      <span className="stock-value">{product.stock}</span>
-                      <button
-                        className="mini-btn"
-                        onClick={() => updateStock(product.id, 1)}
-                      >+</button>
-                    </div>
-                  </td>
-                  <td>{formatMoney(product.price)}</td>
-                  <td>
-                    <button
-                      className="mini-btn danger"
-                      onClick={() => {
-                        if (window.confirm('Eliminar este producto?')) {
-                          deleteProduct(product.id);
-                        }
-                      }}
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {products.length === 0 && (
+          <div className="table-wrapper">
+            <table className="inventory-table">
+              <thead>
                 <tr>
-                  <td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>
-                    <span className="empty-state" style={{ display: 'block' }}>No hay productos</span>
-                  </td>
+                  <th>Producto</th>
+                  <th>Código</th>
+                  <th>Costo</th>
+                  <th>Precio</th>
+                  <th>Stock</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {products.map(product => (
+                  <tr key={product.id} className={product.stock <= 5 ? 'low-stock' : ''}>
+                    <td>
+                      <strong>{product.name}</strong>
+                    </td>
+                    <td><code>{product.code}</code></td>
+                    <td>{formatMoney(product.cost)}</td>
+                    <td><strong>{formatMoney(product.price)}</strong></td>
+                    <td>
+                      <div className="stock-controls">
+                        <button
+                          className="mini-btn"
+                          onClick={() => updateStock(product.id, -1)}
+                          disabled={product.stock <= 0}
+                          aria-label="Quitar stock"
+                        >−</button>
+                        <span className="stock-value">{product.stock}</span>
+                        <button
+                          className="mini-btn"
+                          onClick={() => updateStock(product.id, 1)}
+                          aria-label="Agregar stock"
+                        >+</button>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`stock-badge ${product.stock <= 0 ? 'empty' : product.stock <= 5 ? 'low' : 'ok'}`}>
+                        {product.stock <= 0 ? 'Sin stock' : product.stock <= 5 ? 'Stock bajo' : 'OK'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="mini-btn danger"
+                        onClick={() => {
+                          if (window.confirm(`Eliminar "${product.name}"?`)) {
+                            deleteProduct(product.id);
+                          }
+                        }}
+                        aria-label={`Eliminar ${product.name}`}
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {products.length === 0 && (
+                  <tr>
+                    <td colSpan="7" className="empty-row">
+                      <div className="empty-state">
+                        <span>No hay productos cargados</span>
+                        <small>Use el formulario de la izquierda para agregar el primero</small>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
