@@ -11,6 +11,10 @@ backend/venv/
 backend/.env
 backend/*.pyc
 
+# Entornos virtuales de Python creados en cualquier carpeta
+venv/
+.venv/
+
 # Editor / OS
 .vscode/
 .idea/
