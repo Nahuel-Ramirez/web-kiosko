@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
@@ -40,7 +42,7 @@ def admin_o_cajero(usuario: Usuario = Depends(get_current_user)) -> Usuario:
     return usuario
 
 
-@router.get("", response_model=list[ProductoOut])
+@router.get("", response_model=List[ProductoOut])
 def listar_productos(
     skip: int = 0,
     limit: int = 100,

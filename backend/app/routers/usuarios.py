@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -27,7 +29,7 @@ def solo_admin(usuario: Usuario = Depends(get_current_user)) -> Usuario:
     return usuario
 
 
-@router.get("", response_model=list[UsuarioOut])
+@router.get("", response_model=List[UsuarioOut])
 def listar_usuarios(
     skip: int = 0,
     limit: int = 100,

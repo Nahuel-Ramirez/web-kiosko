@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 
@@ -113,7 +113,7 @@ class VentaBase(BaseModel):
 
 
 class VentaCreate(VentaBase):
-    detalles: list[DetalleVentaCreate]
+    detalles: List[DetalleVentaCreate]
 
 
 class VentaOut(VentaBase):
@@ -123,7 +123,7 @@ class VentaOut(VentaBase):
     usuario_id: int
     cierre_id: Optional[int] = None
     fecha: datetime
-    detalles: list[DetalleVentaOut] = []
+    detalles: List[DetalleVentaOut] = []
 
 
 # ===== CIERRES DE CAJA =====
@@ -151,7 +151,7 @@ class CierreCajaOut(CierreCajaBase):
 class ResumenTurno(BaseModel):
     """Resumen de un turno/cierre de caja con detalle de ventas."""
     cierre: CierreCajaOut
-    ventas: list[VentaOut]
+    ventas: List[VentaOut]
     total_general: Decimal
     total_efectivo: Decimal
     total_tarjeta: Decimal
@@ -167,7 +167,7 @@ class VentasPorUsuario(BaseModel):
     cantidad_ventas: int
     total_efectivo: Decimal
     total_tarjeta: Decimal
-    cierres: list[CierreCajaOut] = []
+    cierres: List[CierreCajaOut] = []
 
 
 class ReporteVentasPeriodo(BaseModel):
@@ -178,4 +178,4 @@ class ReporteVentasPeriodo(BaseModel):
     total_efectivo: Decimal
     total_tarjeta: Decimal
     cantidad_ventas: int
-    por_usuario: list[VentasPorUsuario]
+    por_usuario: List[VentasPorUsuario]
