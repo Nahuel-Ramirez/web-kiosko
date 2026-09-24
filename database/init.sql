@@ -7,8 +7,12 @@ CREATE TABLE IF NOT EXISTS usuarios (
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     rol VARCHAR(20) NOT NULL CHECK (rol IN ('ADMIN', 'CAJERO')),
-    activo BOOLEAN DEFAULT TRUE
+    activo BOOLEAN DEFAULT TRUE,
+    dni VARCHAR(20) UNIQUE
 );
+
+-- Si la base ya existía de antes (sin esta columna), la agrega sin romper nada.
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS dni VARCHAR(20) UNIQUE;
 
 CREATE TABLE IF NOT EXISTS productos (
     id SERIAL PRIMARY KEY,

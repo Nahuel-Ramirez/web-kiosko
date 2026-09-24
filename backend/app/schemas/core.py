@@ -10,6 +10,7 @@ class UsuarioBase(BaseModel):
     username: str
     rol: str
     activo: bool = True
+    dni: Optional[str] = None
 
 
 class UsuarioCreate(UsuarioBase):
@@ -22,6 +23,7 @@ class UsuarioUpdate(BaseModel):
     rol: Optional[str] = None
     activo: Optional[bool] = None
     password: Optional[str] = None
+    dni: Optional[str] = None
 
 
 class UsuarioOut(UsuarioBase):

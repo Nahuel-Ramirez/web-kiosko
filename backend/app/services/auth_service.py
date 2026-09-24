@@ -1,10 +1,12 @@
+from typing import Optional
+
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, verify_password
 from app.models.usuario import Usuario
 
 
-def authenticate_user(db: Session, username: str, password: str) -> Usuario | None:
+def authenticate_user(db: Session, username: str, password: str) -> Optional[Usuario]:
     """Valida usuario/contraseña. Devuelve el Usuario si es válido, o None."""
     usuario = db.query(Usuario).filter(Usuario.username == username).first()
     if not usuario or not usuario.activo:

@@ -36,6 +36,10 @@ def get_usuario_by_username(db: Session, username: str) -> Optional[Usuario]:
     return db.query(Usuario).filter(Usuario.username == username).first()
 
 
+def get_usuario_by_dni(db: Session, dni: str) -> Optional[Usuario]:
+    return db.query(Usuario).filter(Usuario.dni == dni).first()
+
+
 def get_usuarios(db: Session, skip: int = 0, limit: int = 100) -> list[Usuario]:
     return db.query(Usuario).offset(skip).limit(limit).all()
 
@@ -47,6 +51,7 @@ def create_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
         password_hash=hash_password(datos.password),
         rol=datos.rol,
         activo=datos.activo,
+        dni=datos.dni,
     )
     db.add(usuario)
     db.commit()

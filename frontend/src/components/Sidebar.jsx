@@ -7,6 +7,7 @@ export function Sidebar({ activePanel, setActivePanel }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'admin', label: 'Productos', adminOnly: true },
+    { id: 'cajeros', label: 'Cajeros', adminOnly: true },
     { id: 'caja', label: 'Caja' },
     { id: 'reportes', label: 'Reportes' }
   ];
