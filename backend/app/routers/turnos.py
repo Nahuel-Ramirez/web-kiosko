@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -40,7 +40,7 @@ def registrar_venta(
     return create_venta(db, usuario.id, datos)
 
 
-@router.get("/mis-ventas", response_model=list[VentaOut])
+@router.get("/mis-ventas", response_model=List[VentaOut])
 def mis_ventas(
     fecha_desde: Optional[datetime] = Query(None),
     fecha_hasta: Optional[datetime] = Query(None),
@@ -62,7 +62,7 @@ def cerrar_turno(
     return create_cierre(db, usuario.id, datos)
 
 
-@router.get("/mis-cierres", response_model=list[CierreCajaOut])
+@router.get("/mis-cierres", response_model=List[CierreCajaOut])
 def mis_cierres(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_current_user),
