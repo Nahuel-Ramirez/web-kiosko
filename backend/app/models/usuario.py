@@ -15,6 +15,7 @@ class Usuario(Base):
     password_hash = Column(String(255), nullable=False)
     rol = Column(String(20), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
+    dni = Column(String(20), unique=True, nullable=True, index=True)
 
     cierres = relationship("CierreCaja", back_populates="usuario")
     ventas = relationship("Venta", back_populates="usuario")

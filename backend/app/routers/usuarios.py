@@ -9,6 +9,7 @@ from app.services.core_service import (
     create_usuario,
     delete_usuario,
     get_usuario,
+    get_usuario_by_dni,
     get_usuario_by_username,
     get_usuarios,
     update_usuario,
@@ -59,6 +60,8 @@ def crear_usuario(
     """Crea un nuevo usuario (solo ADMIN)."""
     if get_usuario_by_username(db, datos.username):
         raise HTTPException(status_code=400, detail="El username ya existe")
+    if datos.dni and get_usuario_by_dni(db, datos.dni):
+        raise HTTPException(status_code=400, detail="Ya existe un usuario con ese DNI")
     return create_usuario(db, datos)
 
 
@@ -74,6 +77,10 @@ def actualizar_usuario(
         existing = get_usuario_by_username(db, datos.username)
         if existing.id != usuario_id:
             raise HTTPException(status_code=400, detail="El username ya existe")
+    if datos.dni:
+        existing_dni = get_usuario_by_dni(db, datos.dni)
+        if existing_dni and existing_dni.id != usuario_id:
+            raise HTTPException(status_code=400, detail="Ya existe un usuario con ese DNI")
 
     usuario = update_usuario(db, usuario_id, datos)
     if not usuario:

@@ -5,6 +5,7 @@ import { LoginVisual } from './components/LoginVisual';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { Admin } from './components/Admin';
+import { Cajeros } from './components/Cajeros';
 import { Caja } from './components/Caja';
 import { Reportes } from './components/Reportes';
 
@@ -32,6 +33,8 @@ function AppContent() {
         return <Dashboard />;
       case 'admin':
         return isAdmin ? <Admin /> : <Caja />;
+      case 'cajeros':
+        return isAdmin ? <Cajeros /> : <Caja />;
       case 'caja':
         return <Caja />;
       case 'reportes':
@@ -52,6 +55,7 @@ function AppContent() {
               <h2 id="pageTitle">
                 {activePanel === 'dashboard' && 'Dashboard'}
                 {activePanel === 'admin' && 'Productos'}
+                {activePanel === 'cajeros' && 'Cajeros'}
                 {activePanel === 'caja' && 'Caja'}
                 {activePanel === 'reportes' && 'Reportes'}
               </h2>
