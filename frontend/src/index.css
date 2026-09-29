@@ -336,11 +336,18 @@ input, select {
   align-items: center;
   gap: 1rem;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
 }
 
 .card-header h3 {
   margin: 0;
   font-size: 1.15rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .item-list {

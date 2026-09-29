@@ -3,6 +3,21 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchReportePeriodo, fetchReportePorUsuario, fetchUsuarios } from '../services/reportService';
 
+function descargarCSV(nombreArchivo, filas, encabezados) {
+  const csv = [
+    encabezados.join(','),
+    ...filas.map(fila => fila.map(celda => `"${String(celda).replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
+  
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${nombreArchivo}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export function Reportes() {
   const { currentUser, loading: authLoading } = useAuth();
   const { formatMoney } = useApp();
@@ -87,6 +102,40 @@ export function Reportes() {
       <div className="card">
         <div className="card-header">
           <h3>Reportes de ventas</h3>
+          {(reporte || reporteUsuario) && (
+            <div className="header-actions">
+              {reporte && (
+                <button className="secondary-btn" onClick={() => {
+                  const filas = reporte.por_usuario?.map(u => [
+                    u.usuario_nombre, u.usuario_username, u.cantidad_ventas,
+                    u.total_ventas, u.total_efectivo, u.total_tarjeta
+                  ]) || [];
+                  descargarCSV(
+                    `reporte-general-${fechaDesde}_${fechaHasta}`,
+                    filas,
+                    ['Cajero', 'Usuario', 'Ventas', 'Total', 'Efectivo', 'Tarjeta']
+                  );
+                }}>
+                  📥 Descargar CSV
+                </button>
+              )}
+              {reporteUsuario && (
+                <button className="secondary-btn" onClick={() => {
+                  const filas = reporteUsuario.cierres?.map(c => [
+                    new Date(c.fecha_cierre).toLocaleString('es-AR'),
+                    c.total_efectivo, c.total_tarjeta, c.cantidad_ventas, c.observaciones || ''
+                  ]) || [];
+                  descargarCSV(
+                    `reporte-${reporteUsuario.usuario_username}-${fechaDesde}_${fechaHasta}`,
+                    filas,
+                    ['Fecha', 'Efectivo', 'Tarjeta', 'Ventas', 'Observaciones']
+                  );
+                }}>
+                  📥 Descargar CSV
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="filters-row">
