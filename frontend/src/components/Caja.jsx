@@ -17,8 +17,15 @@ export function Caja() {
     getCartDiscount,
     handleCheckout,
     cancelSale,
-    updateCashReceived
+    updateCashReceived,
+    getVentasDelTurno,
+    getTotalesDelTurno,
+    crearCierre
   } = useApp();
+
+  const [cierreLoading, setCierreLoading] = useState(false);
+  const [cierreError, setCierreError] = useState('');
+  const [cierreExito, setCierreExito] = useState(false);
 
   const filteredProducts = products.filter(product => {
     const term = searchTerm.toLowerCase();
@@ -34,6 +41,30 @@ export function Caja() {
   const total = subtotal - discount;
   const received = Number(cashReceived || 0);
   const change = Math.max(received - total, 0);
+
+  const { totalEfectivo, totalTarjeta, totalTransferencia, cantidad, totalGeneral } = getTotalesDelTurno();
+
+  const handleCierre = async () => {
+    if (cantidad === 0) {
+      setCierreError('No hay ventas en este turno para cerrar');
+      return;
+    }
+    if (!window.confirm(`¿Cerrar caja?\nEfectivo: ${formatMoney(totalEfectivo)}\nTarjeta/Transferencia: ${formatMoney(totalTarjeta + totalTransferencia)}\nVentas: ${cantidad}\nTotal: ${formatMoney(totalGeneral)}`)) {
+      return;
+    }
+    setCierreLoading(true);
+    setCierreError('');
+    setCierreExito(false);
+    try {
+      await crearCierre();
+      setCierreExito(true);
+      setTimeout(() => setCierreExito(false), 3000);
+    } catch (err) {
+      setCierreError(err.message);
+    } finally {
+      setCierreLoading(false);
+    }
+  };
 
   return (
     <section id="cajaPanel" className="panel active-panel">
@@ -156,6 +187,39 @@ export function Caja() {
           <div className="cart-actions">
             <button id="cancelSaleBtn" className="secondary-btn full" onClick={cancelSale}>Cancelar</button>
             <button id="checkoutBtn" className="primary-btn full" onClick={handleCheckout} disabled={cart.length === 0}>Cobrar</button>
+          </div>
+
+          <div className="cierre-section">
+            <div className="card-header">
+              <h3>Cierre de caja (Turno actual)</h3>
+            </div>
+            <div className="cierre-resumen">
+              <div className="cierre-row">
+                <span>Ventas en este turno</span>
+                <strong>{cantidad}</strong>
+              </div>
+              <div className="cierre-row">
+                <span>Efectivo</span>
+                <strong>{formatMoney(totalEfectivo)}</strong>
+              </div>
+              <div className="cierre-row">
+                <span>Tarjeta / Transferencia</span>
+                <strong>{formatMoney(totalTarjeta + totalTransferencia)}</strong>
+              </div>
+              <div className="cierre-row total">
+                <span>Total</span>
+                <strong>{formatMoney(totalGeneral)}</strong>
+              </div>
+            </div>
+            {cierreError && <div className="form-message error">{cierreError}</div>}
+            {cierreExito && <div className="form-message success">Caja cerrada correctamente</div>}
+            <button
+              className="primary-btn full cierre-btn"
+              onClick={handleCierre}
+              disabled={cantidad === 0 || cierreLoading}
+            >
+              {cierreLoading ? 'Cerrando...' : 'Cerrar caja'}
+            </button>
           </div>
         </div>
       </div>

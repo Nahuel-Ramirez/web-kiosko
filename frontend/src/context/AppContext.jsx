@@ -2,6 +2,13 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 const AppContext = createContext(null);
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+function getAuthHeaders() {
+  const token = localStorage.getItem('web_kiosko_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 const initialProducts = [
   { id: 1, code: '750123', name: 'Coca Cola 600ml', category: 'Bebidas', cost: 650, price: 950, stock: 16 },
   { id: 2, code: '750456', name: 'Agua Mineral 500ml', category: 'Bebidas', cost: 350, price: 700, stock: 9 },
@@ -99,6 +106,12 @@ export function AppProvider({ children }) {
     setProducts(prev => prev.filter(product => product.id !== productId));
   }, []);
 
+  const updateProduct = useCallback((productId, productData) => {
+    setProducts(prev => prev.map(product => 
+      product.id === productId ? { ...product, ...productData, id: product.id } : product
+    ));
+  }, []);
+
   const addToCart = useCallback((productId) => {
     const product = products.find(item => item.id === productId);
     if (!product || product.stock <= 0) return;
@@ -148,12 +161,14 @@ export function AppProvider({ children }) {
     const received = Number(cashReceived || 0);
     const change = Math.max(received - total, 0);
 
+    const now = new Date();
     const sale = {
       id: Date.now(),
       items: cart.map(item => item.name).join(', '),
       total,
       method: paymentMethod,
-      time: 'Ahora'
+      fecha: now.toISOString(),
+      time: now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
     };
 
     setSales(prev => [sale, ...prev]);
@@ -180,6 +195,64 @@ export function AppProvider({ children }) {
     setCashReceived(value);
   }, []);
 
+  const getVentasDelTurno = useCallback(() => {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const manana = new Date(hoy);
+    manana.setDate(manana.getDate() + 1);
+    
+    return sales.filter(sale => {
+      const saleDate = new Date(sale.fecha || sale.time);
+      return saleDate >= hoy && saleDate < manana;
+    });
+  }, [sales]);
+
+  const getTotalesDelTurno = useCallback(() => {
+    const ventas = getVentasDelTurno();
+    const totalEfectivo = ventas
+      .filter(v => v.method === 'Efectivo')
+      .reduce((sum, v) => sum + v.total, 0);
+    const totalTarjeta = ventas
+      .filter(v => v.method === 'Tarjeta')
+      .reduce((sum, v) => sum + v.total, 0);
+    const totalTransferencia = ventas
+      .filter(v => v.method === 'Transferencia')
+      .reduce((sum, v) => sum + v.total, 0);
+    const cantidad = ventas.length;
+    const totalGeneral = totalEfectivo + totalTarjeta + totalTransferencia;
+    
+    return { totalEfectivo, totalTarjeta, totalTransferencia, cantidad, totalGeneral, ventas };
+  }, [getVentasDelTurno]);
+
+  const crearCierre = useCallback(async () => {
+    const { totalEfectivo, totalTarjeta, totalTransferencia, cantidad } = getTotalesDelTurno();
+    
+    if (cantidad === 0) {
+      throw new Error('No hay ventas en este turno para cerrar');
+    }
+
+    const response = await fetch(`${API_URL}/api/turnos/cierre`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({
+        total_efectivo: totalEfectivo,
+        total_tarjeta: totalTarjeta + totalTransferencia,
+        cantidad_ventas: cantidad,
+        observaciones: `Cierre automático - ${new Date().toLocaleString('es-AR')}`
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Error al cerrar caja');
+    }
+
+    return response.json();
+  }, [getTotalesDelTurno]);
+
   const value = {
     products,
     sales,
@@ -199,13 +272,17 @@ export function AppProvider({ children }) {
     addProduct,
     updateStock,
     deleteProduct,
+    updateProduct,
     addToCart,
     updateCartQuantity,
     getCartSubtotal,
     getCartDiscount,
     handleCheckout,
     cancelSale,
-    updateCashReceived
+    updateCashReceived,
+    getVentasDelTurno,
+    getTotalesDelTurno,
+    crearCierre
   };
 
   return (

@@ -7,6 +7,7 @@ export function Admin() {
     addProduct,
     updateStock,
     deleteProduct,
+    updateProduct,
     formatMoney
   } = useApp();
 
@@ -17,6 +18,7 @@ export function Admin() {
     price: '',
     stock: ''
   });
+  const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -25,6 +27,27 @@ export function Admin() {
     setFormData(prev => ({ ...prev, [name]: value }));
     if (error) setError('');
     if (success) setSuccess('');
+  };
+
+  const handleEdit = (product) => {
+    setEditingId(product.id);
+    setFormData({
+      name: product.name,
+      code: product.code,
+      cost: product.cost,
+      price: product.price,
+      stock: product.stock
+    });
+    setError('');
+    setSuccess('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData({ name: '', code: '', cost: '', price: '', stock: '' });
+    setError('');
+    setSuccess('');
   };
 
   const handleSubmit = (e) => {
@@ -38,20 +61,29 @@ export function Admin() {
       return;
     }
 
-    if (products.some(item => item.code === code.trim())) {
+    const codeExists = products.some(item => item.code === code.trim() && item.id !== editingId);
+    if (codeExists) {
       setError('Ya existe un producto con ese código de barras.');
       return;
     }
 
-    addProduct({
+    const productData = {
       name: name.trim(),
       code: code.trim(),
       cost: Number(cost),
       price: Number(price),
       stock: Number(stock)
-    });
+    };
 
-    setSuccess('Producto agregado correctamente.');
+    if (editingId) {
+      updateProduct(editingId, productData);
+      setSuccess('Producto actualizado correctamente.');
+    } else {
+      addProduct(productData);
+      setSuccess('Producto agregado correctamente.');
+    }
+
+    setEditingId(null);
     setFormData({ name: '', code: '', cost: '', price: '', stock: '' });
   };
 
@@ -60,7 +92,7 @@ export function Admin() {
       <div className="content-grid two-columns admin-grid">
         <div className="card">
           <div className="card-header">
-            <h3>Agregar producto</h3>
+            <h3>{editingId ? 'Editar producto' : 'Agregar producto'}</h3>
           </div>
           <form id="productForm" className="product-form" onSubmit={handleSubmit}>
             {error && <div className="form-message error">{error}</div>}
@@ -91,6 +123,7 @@ export function Admin() {
                 placeholder="Ej: 750123456789"
                 required
                 autoComplete="off"
+                disabled={editingId}
               />
             </div>
 
@@ -126,7 +159,7 @@ export function Admin() {
             </div>
 
             <div className="form-field">
-              <label htmlFor="prodStock">Stock inicial <span className="required">*</span></label>
+              <label htmlFor="prodStock">Stock <span className="required">*</span></label>
               <input
                 type="number"
                 id="prodStock"
@@ -140,7 +173,16 @@ export function Admin() {
               />
             </div>
 
-            <button type="submit" className="primary-btn full">Guardar producto</button>
+            <div className="form-actions">
+              <button type="submit" className="primary-btn full">
+                {editingId ? 'Guardar cambios' : 'Guardar producto'}
+              </button>
+              {editingId && (
+                <button type="button" className="secondary-btn full" onClick={handleCancelEdit}>
+                  Cancelar
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
@@ -193,17 +235,26 @@ export function Admin() {
                       </span>
                     </td>
                     <td>
-                      <button
-                        className="mini-btn danger"
-                        onClick={() => {
-                          if (window.confirm(`Eliminar "${product.name}"?`)) {
-                            deleteProduct(product.id);
-                          }
-                        }}
-                        aria-label={`Eliminar ${product.name}`}
-                      >
-                        Eliminar
-                      </button>
+                      <div className="action-buttons">
+                        <button
+                          className="mini-btn edit-btn"
+                          onClick={() => handleEdit(product)}
+                          aria-label={`Editar ${product.name}`}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="mini-btn danger"
+                          onClick={() => {
+                            if (window.confirm(`Eliminar "${product.name}"?`)) {
+                              deleteProduct(product.id);
+                            }
+                          }}
+                          aria-label={`Eliminar ${product.name}`}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -493,6 +493,91 @@ input, select {
   color: #dc2626;
 }
 
+.mini-btn.edit-btn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.filter-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.filter-group input,
+.filter-group select {
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--text);
+  font-size: 0.9rem;
+  min-width: 160px;
+}
+
+.reporte-container {
+  margin-top: 1rem;
+}
+
+.reporte-container h4 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.reporte-por-usuario,
+.reporte-cierres {
+  margin-top: 1.5rem;
+}
+
+.reporte-por-usuario h4,
+.reporte-cierres h4 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+@media (max-width: 700px) {
+  .filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filter-group input,
+  .filter-group select {
+    min-width: 100%;
+  }
+}
+
 .search-box input {
   background: #f8fafc;
 }
@@ -783,4 +868,49 @@ input, select {
   .brand-panel {
     padding: 3rem 1.5rem 1rem;
   }
+}
+
+.cierre-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.cierre-section .card-header {
+  margin-bottom: 1rem;
+  padding-bottom: 0;
+  border: none;
+}
+
+.cierre-resumen {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cierre-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cierre-row:last-child {
+  border-bottom: none;
+}
+
+.cierre-row.total {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--brand-strong);
+  border-top: 2px solid var(--line);
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.cierre-btn {
+  font-size: 1rem;
+  padding: 1rem;
 }
