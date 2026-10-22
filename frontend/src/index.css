@@ -1197,23 +1197,10 @@ input, select {
 }
 
 @media print {
-  .ticket-container .ticket-actions,
-  .modal-overlay .modal-header,
-  .modal-overlay .ticket-actions {
+  .ticket-actions,
+  .modal-header,
+  .modal-close {
     display: none !important;
-  }
-  .modal-overlay {
-    position: static;
-    background: none;
-  }
-  .modal {
-    box-shadow: none;
-    padding: 0;
-    max-width: none;
-  }
-  .ticket {
-    box-shadow: none;
-    border-radius: 0;
   }
 }
 
