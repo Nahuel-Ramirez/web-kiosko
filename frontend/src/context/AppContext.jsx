@@ -58,7 +58,9 @@ export function AppProvider({ children }) {
   }, []);
 
   const getLowStockProducts = useCallback(() => {
-    return products.filter((product) => product.stock < 5);
+    return products
+      .filter((product) => product.stock <= 100)
+      .sort((a, b) => a.stock - b.stock);
   }, [products]);
 
   const getTotalProductsValue = useCallback(() => {

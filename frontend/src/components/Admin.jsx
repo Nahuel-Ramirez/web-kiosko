@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { getStockStatus, getStockBadgeClass } from '../utils/stock';
 
 export function Admin() {
   const {
@@ -230,8 +231,8 @@ export function Admin() {
                       </div>
                     </td>
                     <td>
-                      <span className={`stock-badge ${product.stock <= 0 ? 'empty' : product.stock <= 5 ? 'low' : 'ok'}`}>
-                        {product.stock <= 0 ? 'Sin stock' : product.stock <= 5 ? 'Stock bajo' : 'OK'}
+                      <span className={getStockBadgeClass(product.stock)}>
+                        {getStockStatus(product.stock).label}
                       </span>
                     </td>
                     <td>

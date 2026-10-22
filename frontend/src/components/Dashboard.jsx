@@ -1,4 +1,5 @@
 import { useApp } from '../context/AppContext';
+import { getStockStatus, getStockTagClass } from '../utils/stock';
 
 export function Dashboard() {
   const {
@@ -45,7 +46,7 @@ export function Dashboard() {
                     <strong>{item.name}</strong>
                     <small>Stock: {item.stock}</small>
                   </div>
-                  <span className="tag warning">Bajo</span>
+                  <span className={getStockTagClass(item.stock)}>{getStockStatus(item.stock).label}</span>
                 </li>
               ))
             )}
