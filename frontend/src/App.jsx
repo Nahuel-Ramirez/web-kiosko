@@ -8,6 +8,7 @@ import { Admin } from './components/Admin';
 import { Cajeros } from './components/Cajeros';
 import { Caja } from './components/Caja';
 import { Reportes } from './components/Reportes';
+import { PrediccionDemanda } from './components/PrediccionDemanda';
 
 // En true muestra LoginVisual (mockup sin backend). En false usa el login
 // real, conectado a la API (ver src/services/authService.js).
@@ -39,6 +40,8 @@ function AppContent() {
         return <Caja />;
       case 'reportes':
         return <Reportes />;
+      case 'prediccion':
+        return isAdmin ? <PrediccionDemanda /> : <Caja />;
       default:
         return <Dashboard />;
     }
@@ -58,6 +61,7 @@ function AppContent() {
                 {activePanel === 'cajeros' && 'Cajeros'}
                 {activePanel === 'caja' && 'Caja'}
                 {activePanel === 'reportes' && 'Reportes'}
+                {activePanel === 'prediccion' && 'Predicción de Demanda'}
               </h2>
             </div>
           </header>

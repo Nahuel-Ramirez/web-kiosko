@@ -1,7 +1,9 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { getStockStatus, getStockTagClass } from '../utils/stock';
 import { TicketVentaModal } from './TicketVenta';
+import { BarcodeInput } from './ui/BarcodeInput';
+import { ClienteSelectorModal } from './ui/ClienteSelectorModal';
 
 export function Caja() {
   const {
@@ -20,7 +22,6 @@ export function Caja() {
     handleCheckout,
     cancelSale,
     updateCashReceived,
-    getVentasDelTurno,
     getTotalesDelTurno,
     crearCierre
   } = useApp();
@@ -30,6 +31,39 @@ export function Caja() {
   const [cierreExito, setCierreExito] = useState(false);
   const [lastSale, setLastSale] = useState(null);
   const [showTicket, setShowTicket] = useState(false);
+  const [turnoTotales, setTurnoTotales] = useState({
+    totalEfectivo: 0,
+    totalTarjeta: 0,
+    totalTransferencia: 0,
+    cantidad: 0,
+    totalGeneral: 0
+  });
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+  const [showClienteModal, setShowClienteModal] = useState(false);
+
+  const cargarTotalesTurno = async () => {
+    try {
+      const totales = await getTotalesDelTurno();
+      setTurnoTotales(totales);
+    } catch (err) {
+      console.error('Error cargando totales del turno:', err);
+    }
+  };
+
+  const handleBarcodeScan = (code) => {
+    const product = products.find(p => p.code === code);
+    if (product && product.stock > 0) {
+      addToCart(product.id);
+    } else if (product && product.stock <= 0) {
+      alert('Producto sin stock');
+    } else {
+      alert('Producto no encontrado');
+    }
+  };
+
+  const handleSelectCliente = (cliente) => {
+    setClienteSeleccionado(cliente);
+};
 
   const filteredProducts = products.filter(product => {
     const term = searchTerm.toLowerCase();
@@ -46,7 +80,7 @@ export function Caja() {
   const received = Number(cashReceived || 0);
   const change = Math.max(received - total, 0);
 
-  const { totalEfectivo, totalTarjeta, totalTransferencia, cantidad, totalGeneral } = getTotalesDelTurno();
+  const { totalEfectivo, totalTarjeta, totalTransferencia, cantidad, totalGeneral } = turnoTotales;
 
   const handleCierre = async () => {
     if (cantidad === 0) {
@@ -67,6 +101,7 @@ export function Caja() {
       setCierreError(err.message);
     } finally {
       setCierreLoading(false);
+      cargarTotalesTurno();
     }
   };
 
@@ -88,17 +123,19 @@ export function Caja() {
       fecha: now.toISOString(),
       time: now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
       cajero: 'Cajero',
-      cliente: 'Consumidor Final',
+      cliente: clienteSeleccionado?.nombre || 'Consumidor Final',
       metodo_pago: paymentMethod,
       monto_recibido: received,
       vuelto: change,
       subtotal,
       descuento: discount,
+      cliente_id: clienteSeleccionado?.id || 1,
     };
 
     handleCheckout();
     setLastSale(saleData);
     setShowTicket(true);
+    cargarTotalesTurno();
   };
 
   return (
@@ -109,12 +146,10 @@ export function Caja() {
             <div className="card-header">
               <h3>Punto de venta</h3>
               <div className="search-box">
-                <input
-                  id="productSearch"
-                  type="text"
-                  placeholder="Buscar producto o codigo"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                <BarcodeInput
+                  onScan={handleBarcodeScan}
+                  placeholder="Escanee código de barras o busque producto..."
+                  autoFocus
                 />
               </div>
             </div>
@@ -153,6 +188,14 @@ export function Caja() {
           <div className="card cart-panel">
             <div className="card-header">
               <h3>Carrito</h3>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => setShowClienteModal(true)}
+                style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+              >
+                👤 {clienteSeleccionado?.nombre || 'Consumidor Final'}
+              </button>
             </div>
             <div id="cartItems" className="cart-items">
               {cart.length === 0 ? (
@@ -165,16 +208,30 @@ export function Caja() {
                       <small>{formatMoney(item.price)} c/u</small>
                       <div className="qty-controls">
                         <button
-                          data-qty="minus"
-                          data-id={item.id}
+                          className="qty-btn minus"
                           onClick={() => updateCartQuantity(item.id, -1)}
-                        >-</button>
-                        <span>{item.quantity}</span>
+                          aria-label="Disminuir"
+                          disabled={item.quantity <= 1}
+                        >−</button>
+                        <span className="qty-value">{item.quantity}</span>
                         <button
-                          data-qty="plus"
-                          data-id={item.id}
+                          className="qty-btn plus"
                           onClick={() => updateCartQuantity(item.id, 1)}
+                          aria-label="Aumentar"
+                          disabled={item.quantity >= item.stock}
                         >+</button>
+                        <input
+                          type="number"
+                          className="qty-input"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const val = Math.max(1, Math.min(parseInt(e.target.value) || 1, item.stock));
+                            onUpdateQuantity(item.id, val - item.quantity);
+                          }}
+                          min="1"
+                          max={item.stock}
+                          style={{ width: '50px', textAlign: 'center' }}
+                        />
                       </div>
                     </div>
                     <div className="item-total">{formatMoney(item.price * item.quantity)}</div>
@@ -265,6 +322,12 @@ export function Caja() {
         isOpen={showTicket}
         onClose={() => setShowTicket(false)}
         onPrint={() => window.print()}
+      />
+      <ClienteSelectorModal
+        isOpen={showClienteModal}
+        onClose={() => setShowClienteModal(false)}
+        onSelect={handleSelectCliente}
+        initialClient={clienteSeleccionado}
       />
     </Fragment>
   );
