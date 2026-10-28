@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 
-export function BarcodeInput({ onScan, placeholder = 'Escanee código de barras...', autoFocus = true }) {
+// onChange (opcional) recibe el texto mientras se escribe, para filtrar el catálogo.
+export function BarcodeInput({ onScan, onChange, placeholder = 'Escanee código de barras...', autoFocus = true }) {
   const [showScanner, setShowScanner] = useState(true);
   const inputRef = useRef(null);
 
@@ -16,9 +17,10 @@ export function BarcodeInput({ onScan, placeholder = 'Escanee código de barras.
     if (e.key === 'Enter' && e.target.value.trim()) {
       e.preventDefault();
       const code = e.target.value.trim();
-      if (code.length >= 8) {
+      if (code) {
         onScan(code);
         e.target.value = '';
+        if (onChange) onChange('');
         e.target.style.borderColor = '#10b981';
         setTimeout(() => {
           e.target.style.borderColor = '';
@@ -35,6 +37,7 @@ export function BarcodeInput({ onScan, placeholder = 'Escanee código de barras.
         type="text"
         placeholder={placeholder}
         onKeyDown={handleKeyDown}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         autoFocus={autoFocus}
         className="barcode-input"
         style={{

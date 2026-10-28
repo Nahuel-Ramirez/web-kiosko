@@ -1,13 +1,19 @@
 import { useState, Fragment, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { getStockStatus, getStockTagClass } from '../utils/stock';
 import { TicketVentaModal } from './TicketVenta';
 import { BarcodeInput } from './ui/BarcodeInput';
 import { ClienteSelectorModal } from './ui/ClienteSelectorModal';
+import { buscarProductoPorCodigo } from '../services/productosService';
 
 export function Caja() {
+  const { currentUser } = useAuth();
   const {
     products,
+    productsLoading,
+    productsError,
+    loadProducts,
     cart,
     searchTerm,
     setSearchTerm,
@@ -40,24 +46,45 @@ export function Caja() {
   });
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [showClienteModal, setShowClienteModal] = useState(false);
+  const [cobrando, setCobrando] = useState(false);
+  const [ventaError, setVentaError] = useState('');
+  const [scanMensaje, setScanMensaje] = useState('');
 
   const cargarTotalesTurno = async () => {
     try {
       const totales = await getTotalesDelTurno();
       setTurnoTotales(totales);
     } catch (err) {
-      console.error('Error cargando totales del turno:', err);
+      setCierreError(err.message || 'No se pudieron cargar los totales del turno.');
     }
   };
 
-  const handleBarcodeScan = (code) => {
-    const product = products.find(p => p.code === code);
-    if (product && product.stock > 0) {
-      addToCart(product.id);
-    } else if (product && product.stock <= 0) {
-      alert('Producto sin stock');
+  useEffect(() => {
+    cargarTotalesTurno();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Enter en el buscador: primero busca el código exacto en la API; si no existe y el
+  // texto coincide con un único producto del catálogo, agrega ese.
+  const handleBarcodeScan = async (code) => {
+    setScanMensaje('');
+    let product = null;
+    try {
+      product = await buscarProductoPorCodigo(code);
+    } catch {
+      const term = code.toLowerCase();
+      const coincidencias = products.filter(p =>
+        p.name.toLowerCase().includes(term) || p.code.toLowerCase().includes(term)
+      );
+      if (coincidencias.length === 1) product = coincidencias[0];
+    }
+    if (!product) {
+      setScanMensaje(`Producto no encontrado: ${code}`);
+    } else if (product.stock <= 0) {
+      setScanMensaje(`"${product.name}" no tiene stock.`);
     } else {
-      alert('Producto no encontrado');
+      addToCart(product.id);
+      setSearchTerm('');
     }
   };
 
@@ -86,7 +113,7 @@ export function Caja() {
       setCierreError('No hay ventas en este turno para cerrar');
       return;
     }
-    if (!window.confirm(`¿Cerrar caja?\nEfectivo: ${formatMoney(totalEfectivo)}\nTarjeta/Transferencia: ${formatMoney(totalTarjeta + totalTransferencia)}\nVentas: ${cantidad}\nTotal: ${formatMoney(totalGeneral)}`)) {
+    if (!window.confirm(`¿Cerrar caja?\nEfectivo: ${formatMoney(totalEfectivo)}\nTarjeta: ${formatMoney(totalTarjeta)}\nTransferencia: ${formatMoney(totalTransferencia)}\nVentas: ${cantidad}\nTotal: ${formatMoney(totalGeneral)}`)) {
       return;
     }
     setCierreLoading(true);
@@ -104,37 +131,38 @@ export function Caja() {
     }
   };
 
-  const handleCheckoutWithTicket = () => {
-    const subtotal = getCartSubtotal();
-    const discount = getCartDiscount();
-    const total = subtotal - discount;
-    if (!cart.length) return;
+  const handleCheckoutWithTicket = async () => {
+    if (!cart.length || cobrando) return;
+    setVentaError('');
+    setCobrando(true);
 
-    const received = Number(cashReceived || 0);
-    const change = Math.max(received - total, 0);
-
-    const now = new Date();
-    const saleData = {
-      id: Date.now(),
-      items: cart.map(item => item.name).join(', '),
-      total,
-      method: paymentMethod,
-      fecha: now.toISOString(),
-      time: now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-      cajero: 'Cajero',
-      cliente: clienteSeleccionado?.nombre || 'Consumidor Final',
-      metodo_pago: paymentMethod,
-      monto_recibido: received,
-      vuelto: change,
-      subtotal,
-      descuento: discount,
-      cliente_id: clienteSeleccionado?.id || 1,
-    };
-
-    handleCheckout();
-    setLastSale(saleData);
-    setShowTicket(true);
-    cargarTotalesTurno();
+    const itemsTexto = cart.map(item => `${item.quantity} x ${item.name}`).join(', ');
+    try {
+      const venta = await handleCheckout(clienteSeleccionado?.id || 1);
+      setLastSale({
+        id: venta.id,
+        items: itemsTexto,
+        total: Number(venta.total),
+        fecha: venta.fecha,
+        cajero: currentUser?.nombre || 'Cajero',
+        cliente: clienteSeleccionado?.nombre || 'Consumidor Final',
+        metodo_pago: venta.metodo_pago,
+        monto_recibido: Number(venta.monto_recibido),
+        vuelto: Number(venta.vuelto),
+        subtotal,
+        descuento: discount,
+        cliente_id: venta.cliente_id,
+      });
+      setShowTicket(true);
+      setClienteSeleccionado(null);
+      cargarTotalesTurno();
+    } catch (err) {
+      // 409 (sin stock) o 400: se muestra el motivo y el carrito queda como estaba.
+      setVentaError(err.message || 'No se pudo registrar la venta.');
+      loadProducts();
+    } finally {
+      setCobrando(false);
+    }
   };
 
   return (
@@ -147,13 +175,18 @@ export function Caja() {
               <div className="search-box">
                 <BarcodeInput
                   onScan={handleBarcodeScan}
+                  onChange={(value) => { setSearchTerm(value); setScanMensaje(''); }}
                   placeholder="Escanee código de barras o busque producto..."
                   autoFocus
                 />
               </div>
             </div>
+            {scanMensaje && <div className="form-message error">{scanMensaje}</div>}
+            {productsError && <div className="form-message error">{productsError}</div>}
             <div id="catalogGrid" className="catalog-grid">
-              {filteredProducts.length === 0 ? (
+              {productsLoading && products.length === 0 ? (
+                <div className="empty-state">Cargando productos...</div>
+              ) : filteredProducts.length === 0 ? (
                 <div className="empty-state">No se encontraron productos.</div>
               ) : (
                 filteredProducts.map(product => (
@@ -225,7 +258,7 @@ export function Caja() {
                           value={item.quantity}
                           onChange={(e) => {
                             const val = Math.max(1, Math.min(parseInt(e.target.value) || 1, item.stock));
-                            onUpdateQuantity(item.id, val - item.quantity);
+                            updateCartQuantity(item.id, val - item.quantity);
                           }}
                           min="1"
                           max={item.stock}
@@ -266,8 +299,9 @@ export function Caja() {
                   min="0"
                   step="0.01"
                   placeholder="0"
-                  value={cashReceived}
+                  value={paymentMethod === 'Efectivo' ? cashReceived : ''}
                   onChange={(e) => updateCashReceived(e.target.value)}
+                  disabled={paymentMethod !== 'Efectivo'}
                 />
               </label>
               <div className="change-box">
@@ -276,9 +310,13 @@ export function Caja() {
               </div>
             </div>
 
+            {ventaError && <div className="form-message error">{ventaError}</div>}
+
             <div className="cart-actions">
-              <button id="cancelSaleBtn" className="secondary-btn full" onClick={cancelSale}>Cancelar</button>
-              <button id="checkoutBtn" className="primary-btn full" onClick={handleCheckoutWithTicket} disabled={cart.length === 0}>Cobrar</button>
+              <button id="cancelSaleBtn" className="secondary-btn full" onClick={() => { cancelSale(); setVentaError(''); }} disabled={cobrando}>Cancelar</button>
+              <button id="checkoutBtn" className="primary-btn full" onClick={handleCheckoutWithTicket} disabled={cart.length === 0 || cobrando}>
+                {cobrando ? 'Cobrando...' : 'Cobrar'}
+              </button>
             </div>
 
             <div className="cierre-section">
@@ -295,8 +333,12 @@ export function Caja() {
                   <strong>{formatMoney(totalEfectivo)}</strong>
                 </div>
                 <div className="cierre-row">
-                  <span>Tarjeta / Transferencia</span>
-                  <strong>{formatMoney(totalTarjeta + totalTransferencia)}</strong>
+                  <span>Tarjeta</span>
+                  <strong>{formatMoney(totalTarjeta)}</strong>
+                </div>
+                <div className="cierre-row">
+                  <span>Transferencia</span>
+                  <strong>{formatMoney(totalTransferencia)}</strong>
                 </div>
                 <div className="cierre-row total">
                   <span>Total</span>
