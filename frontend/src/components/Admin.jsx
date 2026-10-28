@@ -5,6 +5,9 @@ import { getStockStatus, getStockBadgeClass } from '../utils/stock';
 export function Admin() {
   const {
     products,
+    productsLoading,
+    productsError,
+    loadProducts,
     addProduct,
     updateStock,
     deleteProduct,
@@ -22,6 +25,9 @@ export function Admin() {
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [saving, setSaving] = useState(false);
+  // Id del producto con una operación en curso (stock o baja), para deshabilitar sus botones.
+  const [busyId, setBusyId] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -51,7 +57,7 @@ export function Admin() {
     setSuccess('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -76,16 +82,52 @@ export function Admin() {
       stock: Number(stock)
     };
 
-    if (editingId) {
-      updateProduct(editingId, productData);
-      setSuccess('Producto actualizado correctamente.');
-    } else {
-      addProduct(productData);
-      setSuccess('Producto agregado correctamente.');
+    setSaving(true);
+    try {
+      if (editingId) {
+        await updateProduct(editingId, productData);
+        setSuccess('Producto actualizado correctamente.');
+      } else {
+        await addProduct(productData);
+        setSuccess('Producto agregado correctamente.');
+      }
+      setEditingId(null);
+      setFormData({ name: '', code: '', cost: '', price: '', stock: '' });
+    } catch (err) {
+      setError(err.message || 'No se pudo guardar el producto.');
+    } finally {
+      setSaving(false);
     }
+  };
 
-    setEditingId(null);
-    setFormData({ name: '', code: '', cost: '', price: '', stock: '' });
+  const handleStockChange = async (product, change) => {
+    setError('');
+    setSuccess('');
+    setBusyId(product.id);
+    try {
+      await updateStock(product.id, change);
+    } catch (err) {
+      setError(err.message || 'No se pudo ajustar el stock.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async (product) => {
+    if (!window.confirm(`Eliminar "${product.name}"?`)) return;
+    setError('');
+    setSuccess('');
+    setBusyId(product.id);
+    try {
+      await deleteProduct(product.id);
+      if (editingId === product.id) handleCancelEdit();
+      setSuccess(`Producto "${product.name}" eliminado.`);
+    } catch (err) {
+      // Si el producto tiene ventas el backend responde 409 con el motivo.
+      setError(err.message || 'No se pudo eliminar el producto.');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -175,11 +217,11 @@ export function Admin() {
             </div>
 
             <div className="form-actions">
-              <button type="submit" className="primary-btn full">
-                {editingId ? 'Guardar cambios' : 'Guardar producto'}
+              <button type="submit" className="primary-btn full" disabled={saving}>
+                {saving ? 'Guardando...' : editingId ? 'Guardar cambios' : 'Guardar producto'}
               </button>
               {editingId && (
-                <button type="button" className="secondary-btn full" onClick={handleCancelEdit}>
+                <button type="button" className="secondary-btn full" onClick={handleCancelEdit} disabled={saving}>
                   Cancelar
                 </button>
               )}
@@ -192,6 +234,12 @@ export function Admin() {
             <h3>Inventario</h3>
             <span className="badge">{products.length} productos</span>
           </div>
+          {productsError && (
+            <div className="form-message error">
+              {productsError}{' '}
+              <button type="button" className="mini-btn" onClick={loadProducts}>Reintentar</button>
+            </div>
+          )}
           <div className="table-wrapper">
             <table className="inventory-table">
               <thead>
@@ -218,14 +266,15 @@ export function Admin() {
                       <div className="stock-controls">
                         <button
                           className="mini-btn"
-                          onClick={() => updateStock(product.id, -1)}
-                          disabled={product.stock <= 0}
+                          onClick={() => handleStockChange(product, -1)}
+                          disabled={product.stock <= 0 || busyId === product.id}
                           aria-label="Quitar stock"
                         >−</button>
                         <span className="stock-value">{product.stock}</span>
                         <button
                           className="mini-btn"
-                          onClick={() => updateStock(product.id, 1)}
+                          onClick={() => handleStockChange(product, 1)}
+                          disabled={busyId === product.id}
                           aria-label="Agregar stock"
                         >+</button>
                       </div>
@@ -246,11 +295,8 @@ export function Admin() {
                         </button>
                         <button
                           className="mini-btn danger"
-                          onClick={() => {
-                            if (window.confirm(`Eliminar "${product.name}"?`)) {
-                              deleteProduct(product.id);
-                            }
-                          }}
+                          onClick={() => handleDelete(product)}
+                          disabled={busyId === product.id}
                           aria-label={`Eliminar ${product.name}`}
                         >
                           Eliminar
@@ -259,7 +305,16 @@ export function Admin() {
                     </td>
                   </tr>
                 ))}
-                {products.length === 0 && (
+                {productsLoading && products.length === 0 && (
+                  <tr>
+                    <td colSpan="7" className="empty-row">
+                      <div className="empty-state">
+                        <span>Cargando productos...</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {!productsLoading && !productsError && products.length === 0 && (
                   <tr>
                     <td colSpan="7" className="empty-row">
                       <div className="empty-state">

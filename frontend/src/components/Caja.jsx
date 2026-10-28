@@ -69,8 +69,7 @@ export function Caja() {
     const term = searchTerm.toLowerCase();
     return (
       product.name.toLowerCase().includes(term) ||
-      product.code.toLowerCase().includes(term) ||
-      product.category.toLowerCase().includes(term)
+      product.code.toLowerCase().includes(term)
     );
   });
 
@@ -162,7 +161,7 @@ export function Caja() {
                     <div>
                       <h4>{product.name}</h4>
                       <div className="product-meta">
-                        <span>{product.category}</span>
+                        <span><code>{product.code}</code></span>
                         <span>{product.stock} uds.</span>
                       </div>
                     </div>
