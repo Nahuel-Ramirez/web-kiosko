@@ -147,6 +147,7 @@ def reporte_por_usuario(
     total_ventas = sum(v.total for v in ventas)
     total_efectivo = sum(v.total for v in ventas if v.metodo_pago == "EFECTIVO")
     total_tarjeta = sum(v.total for v in ventas if v.metodo_pago == "TARJETA")
+    total_transferencia = sum(v.total for v in ventas if v.metodo_pago == "TRANSFERENCIA")
 
     cierres = get_cierres_by_usuario(db, usuario_id)
     if fecha_desde_dt:
@@ -166,5 +167,6 @@ def reporte_por_usuario(
         cantidad_ventas=len(ventas),
         total_efectivo=total_efectivo,
         total_tarjeta=total_tarjeta,
+        total_transferencia=total_transferencia,
         cierres=[CierreCajaOut.model_validate(c) for c in cierres],
     )
