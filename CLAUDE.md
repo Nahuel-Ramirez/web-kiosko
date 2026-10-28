@@ -51,18 +51,13 @@ npm run build                 # debe compilar sin errores
 
 ## Estado actual (actualizar al terminar cada HU)
 
-Hecho: HU-01 login/roles, alta de cajeros, clientes, endpoints de venta con stock transaccional (HU-17), cierre de caja, reportes y predicción de demanda, la conexión de Reportes y Cierre al backend, y HU-14 (productos conectados a `/api/productos` vía `services/productosService.js`; `AppContext` ya no usa `kiosko_products` ni `initialProducts`; se quitó `category` de la UI).
+Hecho: HU-01 login/roles, alta de cajeros, clientes, endpoints de venta con stock transaccional (HU-17), cierre de caja, reportes y predicción de demanda, la conexión de Reportes y Cierre al backend, HU-14 (productos conectados a `/api/productos` vía `services/productosService.js`; se quitó `category` de la UI) y HU-20 (Caja cobra con `POST /api/turnos/ventas`; turno, cierre y Dashboard salen de la API; ya no hay `sales` ni `initialSales` en `localStorage`).
 
-Pendiente, y es lo que hay que construir ahora:
+Decisiones del PO aplicadas en HU-20:
+- `metodo_pago` acepta `EFECTIVO`, `TARJETA` y `TRANSFERENCIA` (la transferencia la confirma el cajero a mano). El backend lleva `total_transferencia` aparte en turno, cierre y reportes; `init.sql` se actualizó de forma idempotente.
+- El 5% de descuento del carrito se mantiene: el frontend lo reparte en centavos entre los `subtotal` de cada línea para que `total == suma(subtotal)`.
 
-### HU-20: Conexión Frontend-Backend, Punto de Venta y Cobro
-- El catálogo de `Caja.jsx` sale de `/api/productos`. Búsqueda por texto y por código de barras (ya existe `useBarcodeScanner`; usar `GET /api/productos/codigo/{codigo}`).
-- "Cobrar" debe hacer `POST /api/turnos/ventas`; recién cuando responde 201 se vacía el carrito, se actualiza el stock y se imprime el ticket. Si responde 409 o 400, mostrar el motivo y NO vaciar el carrito.
-- El "Cerrar caja" usa `GET /api/turnos/turno-actual` en vez de los totales locales. Eliminar `sales` e `initialSales` de `localStorage` y que el Dashboard use datos reales.
-- **Puntos que requieren decisión del PO antes de implementar (preguntar, no asumir):**
-  1. La UI ofrece "Transferencia" pero el backend y la base solo aceptan EFECTIVO y TARJETA. ¿Se agrega al backend y a `init.sql`, o se quita de la UI?
-  2. El carrito aplica 5% de descuento automático. El backend exige `total == suma(subtotal)`: hay que repartir el descuento en los `subtotal` de cada línea o eliminarlo.
-- Pruebas manuales mínimas: cobrar con stock suficiente, cobrar con stock insuficiente, cobrar con cliente asignado y como Consumidor Final, cerrar caja y ver el reporte actualizado.
+Pendiente: nada asignado. Bugs conocidos fuera de alcance: las fechas de venta se guardan sin zona horaria (con SQLite quedan en UTC y el frontend las muestra como hora local), y `reportService.formatDateForAPI` usa `toISOString()` (después de las 21 h en Argentina manda el día siguiente).
 
 ## Flujo de Git (obligatorio)
 
