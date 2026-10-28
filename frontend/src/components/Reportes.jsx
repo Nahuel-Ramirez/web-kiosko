@@ -108,12 +108,12 @@ export function Reportes() {
                 <button className="secondary-btn" onClick={() => {
                   const filas = reporte.por_usuario?.map(u => [
                     u.usuario_nombre, u.usuario_username, u.cantidad_ventas,
-                    u.total_ventas, u.total_efectivo, u.total_tarjeta
+                    u.total_ventas, u.total_efectivo, u.total_tarjeta, u.total_transferencia ?? 0
                   ]) || [];
                   descargarCSV(
                     `reporte-general-${fechaDesde}_${fechaHasta}`,
                     filas,
-                    ['Cajero', 'Usuario', 'Ventas', 'Total', 'Efectivo', 'Tarjeta']
+                    ['Cajero', 'Usuario', 'Ventas', 'Total', 'Efectivo', 'Tarjeta', 'Transferencia']
                   );
                 }}>
                   📥 Descargar CSV
@@ -123,12 +123,12 @@ export function Reportes() {
                 <button className="secondary-btn" onClick={() => {
                   const filas = reporteUsuario.cierres?.map(c => [
                     new Date(c.fecha_cierre).toLocaleString('es-AR'),
-                    c.total_efectivo, c.total_tarjeta, c.cantidad_ventas, c.observaciones || ''
+                    c.total_efectivo, c.total_tarjeta, c.total_transferencia ?? 0, c.cantidad_ventas, c.observaciones || ''
                   ]) || [];
                   descargarCSV(
                     `reporte-${reporteUsuario.usuario_username}-${fechaDesde}_${fechaHasta}`,
                     filas,
-                    ['Fecha', 'Efectivo', 'Tarjeta', 'Ventas', 'Observaciones']
+                    ['Fecha', 'Efectivo', 'Tarjeta', 'Transferencia', 'Ventas', 'Observaciones']
                   );
                 }}>
                   📥 Descargar CSV
@@ -194,6 +194,10 @@ export function Reportes() {
                 <div className="value">{formatMoney(reporte.total_tarjeta)}</div>
               </div>
               <div className="stat-card">
+                <div className="label">Transferencia</div>
+                <div className="value">{formatMoney(reporte.total_transferencia ?? 0)}</div>
+              </div>
+              <div className="stat-card">
                 <div className="label">Cantidad de ventas</div>
                 <div className="value">{reporte.cantidad_ventas}</div>
               </div>
@@ -211,6 +215,7 @@ export function Reportes() {
                         <th>Total</th>
                         <th>Efectivo</th>
                         <th>Tarjeta</th>
+                        <th>Transferencia</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -221,6 +226,7 @@ export function Reportes() {
                           <td>{formatMoney(u.total_ventas)}</td>
                           <td>{formatMoney(u.total_efectivo)}</td>
                           <td>{formatMoney(u.total_tarjeta)}</td>
+                          <td>{formatMoney(u.total_transferencia ?? 0)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -251,6 +257,10 @@ export function Reportes() {
                 <div className="label">Tarjeta</div>
                 <div className="value">{formatMoney(reporteUsuario.total_tarjeta)}</div>
               </div>
+              <div className="stat-card">
+                <div className="label">Transferencia</div>
+                <div className="value">{formatMoney(reporteUsuario.total_transferencia ?? 0)}</div>
+              </div>
             </div>
 
             {reporteUsuario.cierres && reporteUsuario.cierres.length > 0 && (
@@ -263,6 +273,7 @@ export function Reportes() {
                         <th>Fecha</th>
                         <th>Efectivo</th>
                         <th>Tarjeta</th>
+                        <th>Transferencia</th>
                         <th>Ventas</th>
                         <th>Observaciones</th>
                       </tr>
@@ -273,6 +284,7 @@ export function Reportes() {
                           <td>{new Date(c.fecha_cierre).toLocaleString('es-AR')}</td>
                           <td>{formatMoney(c.total_efectivo)}</td>
                           <td>{formatMoney(c.total_tarjeta)}</td>
+                          <td>{formatMoney(c.total_transferencia ?? 0)}</td>
                           <td>{c.cantidad_ventas}</td>
                           <td>{c.observaciones || '-'}</td>
                         </tr>
