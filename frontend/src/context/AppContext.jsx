@@ -1,4 +1,13 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useAuth } from './AuthContext';
+import {
+  listarProductos,
+  crearProducto,
+  actualizarProducto,
+  agregarStock,
+  setearStock,
+  eliminarProducto
+} from '../services/productosService';
 
 const AppContext = createContext(null);
 
@@ -9,17 +18,6 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-const initialProducts = [
-  { id: 1, code: '750123', name: 'Coca Cola 600ml', category: 'Bebidas', cost: 650, price: 950, stock: 16 },
-  { id: 2, code: '750456', name: 'Agua Mineral 500ml', category: 'Bebidas', cost: 350, price: 700, stock: 9 },
-  { id: 3, code: '779001', name: 'Chocolate Block', category: 'Alimentos', cost: 480, price: 890, stock: 7 },
-  { id: 4, code: '779456', name: 'Galletas Saladas', category: 'Alimentos', cost: 420, price: 760, stock: 12 },
-  { id: 5, code: '779999', name: 'Café Molido', category: 'Bebidas', cost: 520, price: 980, stock: 5 },
-  { id: 6, code: '789012', name: 'Papel Higiénico', category: 'Hogar', cost: 740, price: 1290, stock: 4 },
-  { id: 7, code: '789333', name: 'Snacks Mix', category: 'Snacks', cost: 510, price: 900, stock: 8 },
-  { id: 8, code: '789777', name: 'Jugo de Naranja', category: 'Bebidas', cost: 420, price: 820, stock: 3 }
-];
-
 const initialSales = [
   { id: 1001, items: 'Coca Cola + Agua', total: 1650, method: 'Efectivo', time: 'Hace 20 min' },
   { id: 1002, items: 'Milanesa + Snacks', total: 2240, method: 'Tarjeta', time: 'Hace 1 h' },
@@ -27,10 +25,10 @@ const initialSales = [
 ];
 
 export function AppProvider({ children }) {
-  const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem('kiosko_products');
-    return saved ? JSON.parse(saved) : initialProducts;
-  });
+  const { currentUser } = useAuth();
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState('');
   const [sales, setSales] = useState(() => {
     const saved = localStorage.getItem('kiosko_sales');
     return saved ? JSON.parse(saved) : initialSales;
@@ -41,9 +39,29 @@ export function AppProvider({ children }) {
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
   const [activePanel, setActivePanel] = useState('dashboard');
 
+  const loadProducts = useCallback(async () => {
+    setProductsLoading(true);
+    setProductsError('');
+    try {
+      setProducts(await listarProductos());
+    } catch (err) {
+      setProductsError(err.message || 'No se pudieron cargar los productos.');
+    } finally {
+      setProductsLoading(false);
+    }
+  }, []);
+
+  // Los productos salen de la API: se cargan al iniciar sesión y se vacían al salir.
   useEffect(() => {
-    localStorage.setItem('kiosko_products', JSON.stringify(products));
-  }, [products]);
+    // Limpia datos viejos de la versión que guardaba productos en localStorage.
+    localStorage.removeItem('kiosko_products');
+    if (currentUser) {
+      loadProducts();
+    } else {
+      setProducts([]);
+      setProductsError('');
+    }
+  }, [currentUser, loadProducts]);
 
   useEffect(() => {
     localStorage.setItem('kiosko_sales', JSON.stringify(sales));
@@ -83,36 +101,38 @@ export function AppProvider({ children }) {
       .slice(0, 4);
   }, [products]);
 
-  const addProduct = useCallback((productData) => {
-    const newProduct = {
-      id: Date.now(),
-      ...productData,
-      stock: Number(productData.stock),
-      price: Number(productData.price),
-      cost: Number(productData.cost)
-    };
-    setProducts(prev => [...prev, newProduct]);
+  // Las operaciones de productos persisten en la API y actualizan el estado con la respuesta.
+  // Si el backend rechaza la operación, el Error lleva su mensaje (detail) para mostrarlo.
+  const replaceProduct = useCallback((updated) => {
+    setProducts(prev => prev.map(product => (product.id === updated.id ? updated : product)));
   }, []);
 
-  const updateStock = useCallback((productId, change) => {
-    setProducts(prev => prev.map(product => {
-      if (product.id === productId) {
-        const newStock = Math.max(0, product.stock + change);
-        return { ...product, stock: newStock };
-      }
-      return product;
-    }));
+  const addProduct = useCallback(async (productData) => {
+    const created = await crearProducto(productData);
+    setProducts(prev => [...prev, created]);
+    return created;
   }, []);
 
-  const deleteProduct = useCallback((productId) => {
+  const updateStock = useCallback(async (productId, change) => {
+    const product = products.find(item => item.id === productId);
+    if (!product) return null;
+    const updated = change > 0
+      ? await agregarStock(productId, change)
+      : await setearStock(productId, Math.max(0, product.stock + change));
+    replaceProduct(updated);
+    return updated;
+  }, [products, replaceProduct]);
+
+  const deleteProduct = useCallback(async (productId) => {
+    await eliminarProducto(productId);
     setProducts(prev => prev.filter(product => product.id !== productId));
   }, []);
 
-  const updateProduct = useCallback((productId, productData) => {
-    setProducts(prev => prev.map(product => 
-      product.id === productId ? { ...product, ...productData, id: product.id } : product
-    ));
-  }, []);
+  const updateProduct = useCallback(async (productId, productData) => {
+    const updated = await actualizarProducto(productId, productData);
+    replaceProduct(updated);
+    return updated;
+  }, [replaceProduct]);
 
   const addToCart = useCallback((productId) => {
     const product = products.find(item => item.id === productId);
@@ -257,6 +277,9 @@ export function AppProvider({ children }) {
 
   const value = {
     products,
+    productsLoading,
+    productsError,
+    loadProducts,
     sales,
     cart,
     searchTerm,
