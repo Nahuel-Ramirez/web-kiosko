@@ -43,7 +43,7 @@ npm run build                 # debe compilar sin errores
 - Auth: `POST /api/auth/login` devuelve `{access_token, rol, nombre}`. El frontend guarda el token en `localStorage` con la clave `web_kiosko_token` y lo manda como `Authorization: Bearer <token>`. Hay un `AuthContext` y servicios en `frontend/src/services/` que se pueden reusar.
 - Productos: `/api/productos` (listar y buscar por código: ADMIN y CAJERO; alta, edición, stock y baja: ADMIN). Campos: `codigo_barras, nombre, precio_costo, precio_venta, stock_actual, stock_minimo`.
 - Ventas: `POST /api/turnos/ventas` con `{cliente_id, total, metodo_pago, monto_recibido, vuelto, detalles:[{producto_id, cantidad, precio_unitario, subtotal}]}`. El backend exige que `total` sea igual a la suma de los `subtotal`, valida stock (409 si no alcanza) y descuenta stock de forma atómica.
-- `metodo_pago`: solo `EFECTIVO` o `TARJETA`.
+- `metodo_pago`: `EFECTIVO`, `TARJETA` o `TRANSFERENCIA`. Turno, cierre y reportes devuelven `total_transferencia` aparte.
 - Cliente por defecto: `cliente_id = 1` (Consumidor Final). Búsqueda: `GET /api/clientes/buscar?dni=`.
 - Cierre de caja: `GET /api/turnos/turno-actual` (ventas abiertas y totales calculados en servidor), `POST /api/turnos/cierre`.
 - Reportes (solo ADMIN): `/api/turnos/reporte/periodo`, `/api/turnos/reporte/usuario/{id}`, `/api/reportes/ventas-por-hora`, `/api/reportes/horas-pico`, `/api/reportes/productos-mas-vendidos`. Las fechas van como `YYYY-MM-DD` e incluyen el día completo.
