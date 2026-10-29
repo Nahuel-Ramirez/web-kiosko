@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-METODOS_PAGO_VALIDOS = {"EFECTIVO", "TARJETA"}
+METODOS_PAGO_VALIDOS = {"EFECTIVO", "TARJETA", "TRANSFERENCIA"}
 ROLES_VALIDOS = {"ADMIN", "CAJERO"}
 
 
@@ -161,6 +161,7 @@ class VentaOut(VentaBase):
 class CierreCajaBase(BaseModel):
     total_efectivo: Decimal = Field(default=0, ge=0)
     total_tarjeta: Decimal = Field(default=0, ge=0)
+    total_transferencia: Decimal = Field(default=0, ge=0)
     cantidad_ventas: int = Field(default=0, ge=0)
     observaciones: Optional[str] = None
 
@@ -186,6 +187,7 @@ class ResumenTurno(BaseModel):
     total_general: Decimal
     total_efectivo: Decimal
     total_tarjeta: Decimal
+    total_transferencia: Decimal = Decimal("0")
     cantidad_ventas: int
 
 
@@ -196,6 +198,7 @@ class TurnoActualOut(BaseModel):
     cantidad_ventas: int
     total_efectivo: Decimal
     total_tarjeta: Decimal
+    total_transferencia: Decimal = Decimal("0")
     total_general: Decimal
     ventas: List[VentaOut] = []
 
@@ -209,6 +212,7 @@ class VentasPorUsuario(BaseModel):
     cantidad_ventas: int
     total_efectivo: Decimal
     total_tarjeta: Decimal
+    total_transferencia: Decimal = Decimal("0")
     cierres: List[CierreCajaOut] = []
 
 
@@ -219,6 +223,7 @@ class ReporteVentasPeriodo(BaseModel):
     total_general: Decimal
     total_efectivo: Decimal
     total_tarjeta: Decimal
+    total_transferencia: Decimal = Decimal("0")
     cantidad_ventas: int
     por_usuario: List[VentasPorUsuario]
 

@@ -75,7 +75,9 @@ def test_venta_descuenta_stock(client, cajero_h, admin_h, producto):
 def test_venta_normaliza_metodo_pago(client, cajero_h, producto):
     r = client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, metodo="efectivo"))
     assert r.status_code == 201 and r.json()["metodo_pago"] == "EFECTIVO"
-    assert client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, metodo="transferencia")).status_code == 422
+    r = client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, metodo="transferencia"))
+    assert r.status_code == 201 and r.json()["metodo_pago"] == "TRANSFERENCIA"
+    assert client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, metodo="cheque")).status_code == 422
 
 
 def test_venta_stock_insuficiente_no_guarda_nada(client, cajero_h, admin_h, producto):
@@ -118,6 +120,32 @@ def test_cierre_vincula_ventas_y_calcula_en_servidor(client, cajero_h, admin_h, 
     resumen = client.get("/api/turnos/cierre/%s" % c["id"], headers=cajero_h).json()
     assert resumen["cantidad_ventas"] == 2
     assert client.get("/api/turnos/turno-actual", headers=cajero_h).json()["cantidad_ventas"] == 0
+
+
+def test_transferencia_tiene_total_propio_en_turno_cierre_y_reporte(client, cajero_h, admin_h, producto):
+    client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, "EFECTIVO"))
+    client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, "TARJETA"))
+    client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 2, "TRANSFERENCIA"))
+    turno = client.get("/api/turnos/turno-actual", headers=cajero_h).json()
+    assert float(turno["total_transferencia"]) == 360 and float(turno["total_tarjeta"]) == 180
+    assert float(turno["total_general"]) == 720
+
+    c = client.post("/api/turnos/cierre", headers=cajero_h, json={}).json()
+    assert float(c["total_transferencia"]) == 360 and float(c["total_tarjeta"]) == 180 and float(c["total_efectivo"]) == 180
+
+    hoy = date.today().isoformat()
+    rep = client.get("/api/turnos/reporte/periodo", headers=admin_h, params={"fecha_desde": hoy, "fecha_hasta": hoy}).json()
+    assert float(rep["total_transferencia"]) == 360 and float(rep["total_tarjeta"]) == 180
+    assert float(rep["por_usuario"][0]["total_transferencia"]) == 360
+    assert float(rep["por_usuario"][0]["total_tarjeta"]) == 180
+
+
+def test_venta_con_descuento_repartido_en_subtotales(client, cajero_h, producto):
+    # Como lo arma la Caja: 5% de descuento repartido en el subtotal de cada linea.
+    p = venta_payload(producto, 2)
+    p["detalles"][0]["subtotal"] = "342.00"  # 360 - 18
+    p["total"] = "342.00"
+    assert client.post("/api/turnos/ventas", headers=cajero_h, json=p).status_code == 201
 
 
 def test_cierre_sin_ventas_en_base_conserva_payload_legacy(client, cajero_h):

@@ -38,9 +38,13 @@ CREATE TABLE IF NOT EXISTS cierres_caja (
     fecha_cierre TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     total_efectivo DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
     total_tarjeta DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    total_transferencia DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
     cantidad_ventas INT NOT NULL DEFAULT 0,
     observaciones TEXT
 );
+
+-- HU-20: pago por transferencia. Si la base ya existía, agrega la columna sin romper nada.
+ALTER TABLE cierres_caja ADD COLUMN IF NOT EXISTS total_transferencia DECIMAL(12, 2) NOT NULL DEFAULT 0.00;
 
 CREATE TABLE IF NOT EXISTS ventas (
     id SERIAL PRIMARY KEY,
@@ -49,10 +53,16 @@ CREATE TABLE IF NOT EXISTS ventas (
     cierre_id INT REFERENCES cierres_caja(id),
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     total DECIMAL(12, 2) NOT NULL,
-    metodo_pago VARCHAR(20) NOT NULL CHECK (metodo_pago IN ('EFECTIVO', 'TARJETA')),
+    metodo_pago VARCHAR(20) NOT NULL CHECK (metodo_pago IN ('EFECTIVO', 'TARJETA', 'TRANSFERENCIA')),
     monto_recibido DECIMAL(12, 2),
     vuelto DECIMAL(12, 2)
 );
+
+-- HU-20: si la base ya existía, reemplaza el CHECK viejo (solo EFECTIVO/TARJETA).
+-- ventas_metodo_pago_check es el nombre que PostgreSQL le asigna al CHECK de la columna.
+ALTER TABLE ventas DROP CONSTRAINT IF EXISTS ventas_metodo_pago_check;
+ALTER TABLE ventas ADD CONSTRAINT ventas_metodo_pago_check
+    CHECK (metodo_pago IN ('EFECTIVO', 'TARJETA', 'TRANSFERENCIA'));
 
 CREATE TABLE IF NOT EXISTS detalle_ventas (
     id SERIAL PRIMARY KEY,

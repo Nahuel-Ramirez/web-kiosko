@@ -299,20 +299,23 @@ def get_ventas_abiertas(db: Session, usuario_id: int) -> List[Venta]:
 
 
 def _totales_ventas(ventas: List[Venta]):
+    """Devuelve (efectivo, tarjeta, transferencia) sumando el total de cada venta."""
     total_efectivo = sum((v.total for v in ventas if v.metodo_pago == "EFECTIVO"), Decimal("0"))
     total_tarjeta = sum((v.total for v in ventas if v.metodo_pago == "TARJETA"), Decimal("0"))
-    return total_efectivo, total_tarjeta
+    total_transferencia = sum((v.total for v in ventas if v.metodo_pago == "TRANSFERENCIA"), Decimal("0"))
+    return total_efectivo, total_tarjeta, total_transferencia
 
 
 def get_turno_actual(db: Session, usuario_id: int) -> dict:
     """Resumen del turno abierto (ventas aun sin cierre) calculado en el servidor."""
     ventas = get_ventas_abiertas(db, usuario_id)
-    total_efectivo, total_tarjeta = _totales_ventas(ventas)
+    total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
     return {
         "cantidad_ventas": len(ventas),
         "total_efectivo": total_efectivo,
         "total_tarjeta": total_tarjeta,
-        "total_general": total_efectivo + total_tarjeta,
+        "total_transferencia": total_transferencia,
+        "total_general": total_efectivo + total_tarjeta + total_transferencia,
         "ventas": ventas,
     }
 
@@ -327,16 +330,18 @@ def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> Cier
     """
     ventas = get_ventas_abiertas(db, usuario_id)
     if ventas:
-        total_efectivo, total_tarjeta = _totales_ventas(ventas)
+        total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
         cantidad = len(ventas)
     else:
         total_efectivo, total_tarjeta = datos.total_efectivo, datos.total_tarjeta
+        total_transferencia = datos.total_transferencia
         cantidad = datos.cantidad_ventas
 
     cierre = CierreCaja(
         usuario_id=usuario_id,
         total_efectivo=total_efectivo,
         total_tarjeta=total_tarjeta,
+        total_transferencia=total_transferencia,
         cantidad_ventas=cantidad,
         observaciones=datos.observaciones,
     )
@@ -379,8 +384,7 @@ def get_resumen_turno(db: Session, cierre_id: int) -> Optional[ResumenTurno]:
     ventas = get_ventas_by_cierre(db, cierre_id)
 
     total_general = sum(v.total for v in ventas)
-    total_efectivo = sum(v.total for v in ventas if v.metodo_pago == "EFECTIVO")
-    total_tarjeta = sum(v.total for v in ventas if v.metodo_pago == "TARJETA")
+    total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
 
     return ResumenTurno(
         cierre=CierreCajaOut.model_validate(cierre),
@@ -388,6 +392,7 @@ def get_resumen_turno(db: Session, cierre_id: int) -> Optional[ResumenTurno]:
         total_general=total_general,
         total_efectivo=total_efectivo,
         total_tarjeta=total_tarjeta,
+        total_transferencia=total_transferencia,
         cantidad_ventas=len(ventas),
     )
 
@@ -416,12 +421,15 @@ def get_reporte_ventas_periodo(
                 "cantidad_ventas": 0,
                 "total_efectivo": Decimal("0"),
                 "total_tarjeta": Decimal("0"),
+                "total_transferencia": Decimal("0"),
                 "cierres": [],
             }
         por_usuario_dict[uid]["total_ventas"] += v.total
         por_usuario_dict[uid]["cantidad_ventas"] += 1
         if v.metodo_pago == "EFECTIVO":
             por_usuario_dict[uid]["total_efectivo"] += v.total
+        elif v.metodo_pago == "TRANSFERENCIA":
+            por_usuario_dict[uid]["total_transferencia"] += v.total
         else:
             por_usuario_dict[uid]["total_tarjeta"] += v.total
 
@@ -440,8 +448,7 @@ def get_reporte_ventas_periodo(
     por_usuario = [VentasPorUsuario(**v) for v in por_usuario_dict.values()]
 
     total_general = sum(v.total for v in ventas)
-    total_efectivo = sum(v.total for v in ventas if v.metodo_pago == "EFECTIVO")
-    total_tarjeta = sum(v.total for v in ventas if v.metodo_pago == "TARJETA")
+    total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
 
     return ReporteVentasPeriodo(
         fecha_desde=fecha_desde,
@@ -449,6 +456,7 @@ def get_reporte_ventas_periodo(
         total_general=total_general,
         total_efectivo=total_efectivo,
         total_tarjeta=total_tarjeta,
+        total_transferencia=total_transferencia,
         cantidad_ventas=len(ventas),
         por_usuario=por_usuario,
     )
