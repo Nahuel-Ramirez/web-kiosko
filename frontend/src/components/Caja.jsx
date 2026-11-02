@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getStockStatus, getStockTagClass } from '../utils/stock';
 import { TicketVentaModal } from './TicketVenta';
 import { BarcodeInput } from './ui/BarcodeInput';
+import { ProductSearchInput } from './ui/ProductSearchInput';
 import { ClienteSelectorModal } from './ui/ClienteSelectorModal';
 import { buscarProductoPorCodigo } from '../services/productosService';
 
@@ -93,10 +94,12 @@ export function Caja() {
 };
 
   const filteredProducts = products.filter(product => {
-    const term = searchTerm.toLowerCase();
+    const term = (searchTerm || '').toLowerCase();
+    if (!term) return true;
     return (
       product.name.toLowerCase().includes(term) ||
-      product.code.toLowerCase().includes(term)
+      product.code.toLowerCase().includes(term) ||
+      (product.category && product.category.toLowerCase().includes(term))
     );
   });
 
@@ -175,9 +178,13 @@ export function Caja() {
               <div className="search-box">
                 <BarcodeInput
                   onScan={handleBarcodeScan}
-                  onChange={(value) => { setSearchTerm(value); setScanMensaje(''); }}
-                  placeholder="Escanee código de barras o busque producto..."
+                  placeholder="Escanee código de barras..."
                   autoFocus
+                />
+                <ProductSearchInput
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  placeholder="Buscar por nombre, código o categoría..."
                 />
               </div>
             </div>
