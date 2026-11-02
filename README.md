@@ -79,7 +79,7 @@ Detalle de qué va en cada carpeta y la rutina diaria de trabajo (comandos, conv
 
 ## Modelo de datos (resumen)
 
-`usuarios`, `productos`, `clientes`, `cierres_caja`, `ventas`, `detalle_ventas` — el detalle completo de columnas y restricciones está en la guía de desarrollo del proyecto.
+`usuarios`, `productos`, `clientes`, `cierres_caja`, `ventas`, `detalle_ventas` — el diagrama entidad-relación, el detalle de columnas y restricciones y cómo crear la base están en [docs/base-de-datos.md](docs/base-de-datos.md).
 
 ## Backlog priorizado (Historias de Usuario)
 
@@ -141,6 +141,6 @@ Documentación interactiva completa en `http://localhost:8000/docs` con el backe
 | Reportes de ventas | `GET /api/turnos/reporte/periodo`, `GET /api/turnos/reporte/usuario/{id}` | ADMIN |
 | Analítica | `GET /api/reportes/ventas-por-hora`, `GET /api/reportes/horas-pico`, `GET /api/reportes/productos-mas-vendidos` (HU-09) | ADMIN |
 
-Reglas de negocio relevantes: una venta se guarda de forma atómica (valida cliente, productos, stock suficiente y que el total coincida con el detalle); `metodo_pago` solo admite `EFECTIVO` o `TARJETA`; el cierre de caja vincula las ventas abiertas del cajero y calcula los totales en el servidor; las fechas de los reportes (`YYYY-MM-DD`) incluyen el día completo.
+Reglas de negocio relevantes: una venta se guarda de forma atómica (valida cliente, productos, stock suficiente y que el total coincida con el detalle); `metodo_pago` solo admite `EFECTIVO`, `TARJETA` o `TRANSFERENCIA`; el cierre de caja vincula las ventas abiertas del cajero y calcula los totales en el servidor; las fechas de los reportes (`YYYY-MM-DD`) incluyen el día completo.
 
 Tests: `cd backend && python -m pytest`.
