@@ -23,6 +23,7 @@ from app.schemas.core import (
     UsuarioCreate,
     UsuarioUpdate,
     VentasPorUsuario,
+    VentaOut,
     VentaCreate,
 )
 
@@ -77,6 +78,11 @@ def delete_usuario(db: Session, usuario_id: int) -> bool:
     usuario = get_usuario(db, usuario_id)
     if not usuario:
         return False
+    if (
+        db.query(Venta).filter(Venta.usuario_id == usuario_id).first()
+        or db.query(CierreCaja).filter(CierreCaja.usuario_id == usuario_id).first()
+    ):
+        raise ReglaNegocioError("El usuario tiene ventas registradas; desactivalo en lugar de eliminarlo", status_code=409)
     db.delete(usuario)
     db.commit()
     return True
@@ -93,6 +99,20 @@ def get_cliente(db: Session, cliente_id: int) -> Optional[Cliente]:
 
 def get_cliente_by_dni(db: Session, dni_cuit: str) -> Optional[Cliente]:
     return db.query(Cliente).filter(Cliente.dni_cuit == dni_cuit).first()
+
+
+def buscar_clientes(db: Session, termino: str, limite: int = 10) -> List[Cliente]:
+    """Busca por DNI/CUIT (prefijo) o por razon social (contiene)."""
+    termino = termino.strip()
+    like_doc = termino + "%"
+    like_nombre = "%" + termino + "%"
+    return (
+        db.query(Cliente)
+        .filter((Cliente.dni_cuit.like(like_doc)) | (Cliente.razon_social.ilike(like_nombre)))
+        .order_by(Cliente.razon_social.asc())
+        .limit(limite)
+        .all()
+    )
 
 
 def create_cliente(db: Session, datos: ClienteCreate) -> Cliente:
@@ -118,6 +138,8 @@ def delete_cliente(db: Session, cliente_id: int) -> bool:
     cliente = get_cliente(db, cliente_id)
     if not cliente:
         return False
+    if db.query(Venta).filter(Venta.cliente_id == cliente_id).first():
+        raise ReglaNegocioError("El cliente tiene ventas registradas; no se puede eliminar", status_code=409)
     db.delete(cliente)
     db.commit()
     return True
@@ -159,40 +181,87 @@ def delete_producto(db: Session, producto_id: int) -> bool:
     producto = get_producto(db, producto_id)
     if not producto:
         return False
+    if db.query(DetalleVenta).filter(DetalleVenta.producto_id == producto_id).first():
+        raise ReglaNegocioError("El producto tiene ventas registradas; no se puede eliminar", status_code=409)
     db.delete(producto)
     db.commit()
     return True
 
 
 # ===== VENTAS =====
+class ReglaNegocioError(Exception):
+    """Error de regla de negocio (se traduce a HTTP 400/409 en los routers)."""
+
+    def __init__(self, mensaje: str, status_code: int = 400):
+        super().__init__(mensaje)
+        self.mensaje = mensaje
+        self.status_code = status_code
+
+
 def create_venta(db: Session, usuario_id: int, datos: VentaCreate) -> Venta:
-    venta = Venta(
-        usuario_id=usuario_id,
-        cliente_id=datos.cliente_id,
-        total=datos.total,
-        metodo_pago=datos.metodo_pago,
-        monto_recibido=datos.monto_recibido,
-        vuelto=datos.vuelto,
-    )
-    db.add(venta)
-    db.flush()
+    """Registra una venta de forma atomica.
 
+    Valida: cliente existente, productos existentes, stock suficiente (sumando
+    lineas repetidas del mismo producto) y que el total coincida con el detalle.
+    Si algo falla no se guarda nada (rollback).
+    """
+    if not get_cliente(db, datos.cliente_id):
+        raise ReglaNegocioError("El cliente indicado no existe")
+
+    # Cantidad total pedida por producto (una misma venta puede repetir lineas)
+    pedido: dict = {}
     for det in datos.detalles:
-        detalle = DetalleVenta(
-            venta_id=venta.id,
-            producto_id=det.producto_id,
-            cantidad=det.cantidad,
-            precio_unitario=det.precio_unitario,
-            subtotal=det.subtotal,
+        pedido[det.producto_id] = pedido.get(det.producto_id, 0) + det.cantidad
+
+    productos = {}
+    for producto_id, cantidad in pedido.items():
+        producto = get_producto(db, producto_id)
+        if not producto:
+            raise ReglaNegocioError("El producto %s no existe" % producto_id)
+        if producto.stock_actual < cantidad:
+            raise ReglaNegocioError(
+                "Stock insuficiente para '%s' (disponible: %s, pedido: %s)"
+                % (producto.nombre, producto.stock_actual, cantidad),
+                status_code=409,
+            )
+        productos[producto_id] = producto
+
+    suma_detalle = sum(det.subtotal for det in datos.detalles)
+    if suma_detalle != datos.total:
+        raise ReglaNegocioError(
+            "El total (%s) no coincide con la suma del detalle (%s)" % (datos.total, suma_detalle)
         )
-        db.add(detalle)
 
-        # Descontar stock
-        producto = get_producto(db, det.producto_id)
-        if producto:
-            producto.stock_actual -= det.cantidad
+    try:
+        venta = Venta(
+            usuario_id=usuario_id,
+            cliente_id=datos.cliente_id,
+            total=datos.total,
+            metodo_pago=datos.metodo_pago,
+            monto_recibido=datos.monto_recibido,
+            vuelto=datos.vuelto,
+        )
+        db.add(venta)
+        db.flush()
 
-    db.commit()
+        for det in datos.detalles:
+            db.add(
+                DetalleVenta(
+                    venta_id=venta.id,
+                    producto_id=det.producto_id,
+                    cantidad=det.cantidad,
+                    precio_unitario=det.precio_unitario,
+                    subtotal=det.subtotal,
+                )
+            )
+
+        for producto_id, cantidad in pedido.items():
+            productos[producto_id].stock_actual -= cantidad
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(venta)
     return venta
 
@@ -219,16 +288,72 @@ def get_ventas_by_cierre(db: Session, cierre_id: int) -> List[Venta]:
 
 
 # ===== CIERRES DE CAJA =====
+def get_ventas_abiertas(db: Session, usuario_id: int) -> List[Venta]:
+    """Ventas del usuario que todavia no pertenecen a ningun cierre de caja."""
+    return (
+        db.query(Venta)
+        .filter(Venta.usuario_id == usuario_id, Venta.cierre_id.is_(None))
+        .order_by(Venta.fecha.asc())
+        .all()
+    )
+
+
+def _totales_ventas(ventas: List[Venta]):
+    """Devuelve (efectivo, tarjeta, transferencia) sumando el total de cada venta."""
+    total_efectivo = sum((v.total for v in ventas if v.metodo_pago == "EFECTIVO"), Decimal("0"))
+    total_tarjeta = sum((v.total for v in ventas if v.metodo_pago == "TARJETA"), Decimal("0"))
+    total_transferencia = sum((v.total for v in ventas if v.metodo_pago == "TRANSFERENCIA"), Decimal("0"))
+    return total_efectivo, total_tarjeta, total_transferencia
+
+
+def get_turno_actual(db: Session, usuario_id: int) -> dict:
+    """Resumen del turno abierto (ventas aun sin cierre) calculado en el servidor."""
+    ventas = get_ventas_abiertas(db, usuario_id)
+    total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
+    return {
+        "cantidad_ventas": len(ventas),
+        "total_efectivo": total_efectivo,
+        "total_tarjeta": total_tarjeta,
+        "total_transferencia": total_transferencia,
+        "total_general": total_efectivo + total_tarjeta + total_transferencia,
+        "ventas": ventas,
+    }
+
+
 def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> CierreCaja:
+    """Cierra el turno del usuario.
+
+    Si hay ventas abiertas registradas en la base, las asocia al cierre y los
+    totales se calculan en el servidor (no se confia en lo que manda el cliente).
+    Si no hay ventas abiertas se conservan los totales enviados (compatibilidad
+    con el frontend que aun calcula el turno de forma local).
+    """
+    ventas = get_ventas_abiertas(db, usuario_id)
+    if ventas:
+        total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
+        cantidad = len(ventas)
+    else:
+        total_efectivo, total_tarjeta = datos.total_efectivo, datos.total_tarjeta
+        total_transferencia = datos.total_transferencia
+        cantidad = datos.cantidad_ventas
+
     cierre = CierreCaja(
         usuario_id=usuario_id,
-        total_efectivo=datos.total_efectivo,
-        total_tarjeta=datos.total_tarjeta,
-        cantidad_ventas=datos.cantidad_ventas,
+        total_efectivo=total_efectivo,
+        total_tarjeta=total_tarjeta,
+        total_transferencia=total_transferencia,
+        cantidad_ventas=cantidad,
         observaciones=datos.observaciones,
     )
-    db.add(cierre)
-    db.commit()
+    try:
+        db.add(cierre)
+        db.flush()
+        for venta in ventas:
+            venta.cierre_id = cierre.id
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(cierre)
     return cierre
 
@@ -259,8 +384,7 @@ def get_resumen_turno(db: Session, cierre_id: int) -> Optional[ResumenTurno]:
     ventas = get_ventas_by_cierre(db, cierre_id)
 
     total_general = sum(v.total for v in ventas)
-    total_efectivo = sum(v.total for v in ventas if v.metodo_pago == "EFECTIVO")
-    total_tarjeta = sum(v.total for v in ventas if v.metodo_pago == "TARJETA")
+    total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
 
     return ResumenTurno(
         cierre=CierreCajaOut.model_validate(cierre),
@@ -268,6 +392,7 @@ def get_resumen_turno(db: Session, cierre_id: int) -> Optional[ResumenTurno]:
         total_general=total_general,
         total_efectivo=total_efectivo,
         total_tarjeta=total_tarjeta,
+        total_transferencia=total_transferencia,
         cantidad_ventas=len(ventas),
     )
 
@@ -296,12 +421,15 @@ def get_reporte_ventas_periodo(
                 "cantidad_ventas": 0,
                 "total_efectivo": Decimal("0"),
                 "total_tarjeta": Decimal("0"),
+                "total_transferencia": Decimal("0"),
                 "cierres": [],
             }
         por_usuario_dict[uid]["total_ventas"] += v.total
         por_usuario_dict[uid]["cantidad_ventas"] += 1
         if v.metodo_pago == "EFECTIVO":
             por_usuario_dict[uid]["total_efectivo"] += v.total
+        elif v.metodo_pago == "TRANSFERENCIA":
+            por_usuario_dict[uid]["total_transferencia"] += v.total
         else:
             por_usuario_dict[uid]["total_tarjeta"] += v.total
 
@@ -320,8 +448,7 @@ def get_reporte_ventas_periodo(
     por_usuario = [VentasPorUsuario(**v) for v in por_usuario_dict.values()]
 
     total_general = sum(v.total for v in ventas)
-    total_efectivo = sum(v.total for v in ventas if v.metodo_pago == "EFECTIVO")
-    total_tarjeta = sum(v.total for v in ventas if v.metodo_pago == "TARJETA")
+    total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
 
     return ReporteVentasPeriodo(
         fecha_desde=fecha_desde,
@@ -329,6 +456,7 @@ def get_reporte_ventas_periodo(
         total_general=total_general,
         total_efectivo=total_efectivo,
         total_tarjeta=total_tarjeta,
+        total_transferencia=total_transferencia,
         cantidad_ventas=len(ventas),
         por_usuario=por_usuario,
     )

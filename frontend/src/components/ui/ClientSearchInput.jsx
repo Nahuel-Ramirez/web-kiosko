@@ -79,11 +79,12 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
+    // Solo cierra si el click no fue ni en el input ni en el dropdown; si no, el
+    // dropdown se desmonta en el mousedown y el click en un cliente nunca llega.
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setShowDropdown(false);
-      }
-      if (inputRef.current && !inputRef.current.contains(e.target)) {
+      const enDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
+      const enInput = inputRef.current && inputRef.current.contains(e.target);
+      if (!enDropdown && !enInput) {
         setShowDropdown(false);
       }
     };

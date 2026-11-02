@@ -13,6 +13,7 @@ class CierreCaja(Base):
     fecha_cierre = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     total_efectivo = Column(Numeric(12, 2), nullable=False, default=0.00)
     total_tarjeta = Column(Numeric(12, 2), nullable=False, default=0.00)
+    total_transferencia = Column(Numeric(12, 2), nullable=False, default=0.00)
     cantidad_ventas = Column(Integer, nullable=False, default=0)
     observaciones = Column(Text, nullable=True)
 

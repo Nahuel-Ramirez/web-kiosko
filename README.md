@@ -79,7 +79,7 @@ Detalle de qué va en cada carpeta y la rutina diaria de trabajo (comandos, conv
 
 ## Modelo de datos (resumen)
 
-`usuarios`, `productos`, `clientes`, `cierres_caja`, `ventas`, `detalle_ventas` — el detalle completo de columnas y restricciones está en la guía de desarrollo del proyecto.
+`usuarios`, `productos`, `clientes`, `cierres_caja`, `ventas`, `detalle_ventas` — el diagrama entidad-relación, el detalle de columnas y restricciones y cómo crear la base están en [docs/base-de-datos.md](docs/base-de-datos.md).
 
 ## Backlog priorizado (Historias de Usuario)
 
@@ -126,3 +126,21 @@ Ver la guía **"Cómo clonar y pushear al repositorio"** (carpeta del proyecto) 
 ## Documentación
 
 La guía integral de desarrollo (historias de usuario completas, diseño de base de datos y división de tareas por sprint) está disponible en la carpeta del proyecto.
+
+## API del backend (resumen)
+
+Documentación interactiva completa en `http://localhost:8000/docs` con el backend levantado.
+
+| Módulo | Endpoints | Acceso |
+|---|---|---|
+| Auth | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Público / logueado |
+| Usuarios | `GET/POST /api/usuarios`, `GET/PUT/DELETE /api/usuarios/{id}` | ADMIN |
+| Productos | `GET /api/productos`, `GET /api/productos/codigo/{codigo}` (ADMIN y CAJERO); alta, edición, stock y baja (ADMIN) | Según rol |
+| Clientes | `GET /api/clientes/buscar?dni=`, `GET/POST /api/clientes` (ADMIN y CAJERO); `PUT/DELETE` (ADMIN) | Según rol |
+| Ventas y turnos | `POST /api/turnos/ventas`, `GET /api/turnos/mis-ventas`, `GET /api/turnos/turno-actual`, `POST /api/turnos/cierre`, `GET /api/turnos/mis-cierres`, `GET /api/turnos/cierre/{id}` | Logueado |
+| Reportes de ventas | `GET /api/turnos/reporte/periodo`, `GET /api/turnos/reporte/usuario/{id}` | ADMIN |
+| Analítica | `GET /api/reportes/ventas-por-hora`, `GET /api/reportes/horas-pico`, `GET /api/reportes/productos-mas-vendidos` (HU-09) | ADMIN |
+
+Reglas de negocio relevantes: una venta se guarda de forma atómica (valida cliente, productos, stock suficiente y que el total coincida con el detalle); `metodo_pago` solo admite `EFECTIVO`, `TARJETA` o `TRANSFERENCIA`; el cierre de caja vincula las ventas abiertas del cajero y calcula los totales en el servidor; las fechas de los reportes (`YYYY-MM-DD`) incluyen el día completo.
+
+Tests: `cd backend && python -m pytest`.

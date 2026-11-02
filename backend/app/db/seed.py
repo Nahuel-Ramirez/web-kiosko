@@ -8,6 +8,7 @@ Ejecutar una sola vez, con la base de datos ya creada (database/init.sql aplicad
 
 from app.core.security import hash_password
 from app.db.session import Base, SessionLocal, engine
+from app.models.cliente import Cliente
 from app.models.usuario import Usuario
 
 USUARIOS_INICIALES = [
@@ -33,8 +34,11 @@ def seed() -> None:
                     activo=True,
                 )
             )
+        if not db.query(Cliente).filter(Cliente.dni_cuit == "0").first():
+            # id=1 por ser el primero; el POS usa cliente_id=1 como Consumidor Final
+            db.add(Cliente(dni_cuit="0", razon_social="Consumidor Final"))
         db.commit()
-        print("Seed de usuarios completado (admin/admin123, cajero/cajero123).")
+        print("Seed completado (admin/admin123, cajero/cajero123, cliente Consumidor Final).")
     finally:
         db.close()
 

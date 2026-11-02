@@ -14,9 +14,10 @@ export function BarcodeInput({ onScan, placeholder = 'Escanee código de barras.
     if (e.key === 'Enter' && e.target.value.trim()) {
       e.preventDefault();
       const code = e.target.value.trim();
-      if (code.length >= 8) {
+      if (code) {
         onScan(code);
         e.target.value = '';
+        if (onChange) onChange('');
         e.target.style.borderColor = '#10b981';
         setTimeout(() => {
           e.target.style.borderColor = '';

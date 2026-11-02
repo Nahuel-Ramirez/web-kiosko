@@ -20,3 +20,8 @@ venv/
 .idea/
 .DS_Store
 Thumbs.db
+
+backend/*.db
+
+# Instrucciones locales de Claude Code (no se versionan)
+CLAUDE.md
