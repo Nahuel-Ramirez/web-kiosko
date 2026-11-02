@@ -3,7 +3,7 @@ productos mas vendidos. Toda la agregacion se hace en Python/SQL estandar para
 funcionar igual en PostgreSQL y en SQLite (dev/tests)."""
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
 
@@ -20,6 +20,16 @@ from app.schemas.core import (
     VentaHoraItem,
     VentasPorHoraOut,
 )
+
+# Zona horaria Argentina (UTC-3)
+ARG_TZ = timezone(timedelta(hours=-3))
+
+def _to_arg_tz(dt: datetime) -> datetime:
+    """Convierte datetime a zona horaria Argentina.
+    Si es naive, asume que YA está en hora local Argentina."""
+    if dt.tzinfo is None:
+        return dt  # naive = ya está en hora local
+    return dt.astimezone(ARG_TZ)
 
 # Una hora es "pico" si su promedio diario supera el promedio de las horas con
 # actividad por este factor (y al menos 1 venta/dia en promedio).
@@ -48,7 +58,7 @@ def ventas_por_hora(db: Session, desde: datetime, hasta: datetime) -> VentasPorH
     unidades: Dict[int, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
     for v in ventas:
-        h = v.fecha.hour
+        h = _to_arg_tz(v.fecha).hour
         cantidad[h] += 1
         monto[h] += v.total
         for d in v.detalles:
@@ -90,13 +100,15 @@ def horas_pico(db: Session, desde: datetime, hasta: datetime) -> HorasPicoOut:
     cantidad: Dict[int, int] = defaultdict(int)
     unidades_por_hora: Dict[int, Dict[int, int]] = defaultdict(lambda: defaultdict(int))
     for v in ventas:
-        cantidad[v.fecha.hour] += 1
+        h = _to_arg_tz(v.fecha).hour
+        cantidad[h] += 1
         for d in v.detalles:
-            unidades_por_hora[v.fecha.hour][d.producto_id] += d.cantidad
+            unidades_por_hora[h][d.producto_id] += d.cantidad
 
     promedio_diario = {h: c / dias for h, c in cantidad.items()}
     media = sum(promedio_diario.values()) / len(promedio_diario)
-    umbral = max(media * FACTOR_PICO, 1.0)
+    # Umbral adaptativo: 1.25x el promedio, pero mínimo 0.5 ventas/día para detectar picos en negocios pequeños
+    umbral = max(media * FACTOR_PICO, 0.5)
     horas_en_pico = [h for h, p in promedio_diario.items() if p >= umbral]
 
     picos: List[HoraPicoItem] = []
