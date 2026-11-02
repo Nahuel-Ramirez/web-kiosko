@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { getStockStatus, getStockBadgeClass } from '../utils/stock';
+import { ProductSearchInput, useProductFilter } from './ui/ProductSearchInput';
 
 export function Admin() {
   const {
@@ -9,8 +10,12 @@ export function Admin() {
     updateStock,
     deleteProduct,
     updateProduct,
-    formatMoney
+    formatMoney,
+    searchTerm,
+    setSearchTerm
   } = useApp();
+
+  const filteredProducts = useProductFilter(products, searchTerm);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -190,7 +195,13 @@ export function Admin() {
         <div className="card">
           <div className="card-header">
             <h3>Inventario</h3>
-            <span className="badge">{products.length} productos</span>
+            <ProductSearchInput
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Buscar por nombre, código o categoría..."
+              variant="light"
+            />
+            <span className="badge">{filteredProducts.length} / {products.length} productos</span>
           </div>
           <div className="table-wrapper">
             <table className="inventory-table">
@@ -206,7 +217,7 @@ export function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {products.map(product => (
+                {filteredProducts.map(product => (
                   <tr key={product.id} className={product.stock <= 5 ? 'low-stock' : ''}>
                     <td>
                       <strong>{product.name}</strong>
