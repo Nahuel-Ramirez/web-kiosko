@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -46,14 +46,26 @@ def admin_o_cajero(usuario: Usuario = Depends(get_current_user)) -> Usuario:
 def listar_productos(
     skip: int = 0,
     limit: int = 100,
+    buscar: Optional[str] = Query(None, description="Buscar por nombre o código de barras"),
     solo_stock_bajo: bool = Query(False, description="Filtrar productos con stock <= stock_minimo"),
     db: Session = Depends(get_db),
     _: Usuario = Depends(admin_o_cajero),
 ):
-    """Lista productos. Con solo_stock_bajo=true muestra solo alertas de stock crítico."""
+    """Lista productos con filtros por stock y búsqueda por nombre/código."""
     productos = get_productos(db, skip=skip, limit=limit)
+
+    #Filtro de busqueda por nombre o codigo de barra
+    if buscar:
+        termino = buscar.lower()
+        productos = [
+            p for p in productos 
+            if termino in p.nombre.lower() or termino in p.codigo_barras.lower()
+        ]
+
+    #Filtro por stock crítico
     if solo_stock_bajo:
         productos = [p for p in productos if p.stock_actual <= p.stock_minimo]
+
     return productos
 
 
