@@ -34,20 +34,20 @@ export function PeakHoursChart({ data }) {
       <h4 className="chart-title">Horas Pico Detectadas</h4>
       <div className="chart-wrapper">
         <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={chartData} layout="horizontal">
-            <CartesianGrid strokeDasharray="3 3" vertical={true} />
+          <BarChart data={chartData} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
-              dataKey="label"
-              type="category"
-              tick={{ fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              interval={0}
-            />
-            <YAxis
               type="number"
               tick={{ fontSize: 11 }}
               tickFormatter={(value) => value}
+            />
+            <YAxis
+              dataKey="label"
+              type="category"
+              width={80}
+              tick={{ fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
             />
             <Tooltip
               formatter={(value, name) => [
@@ -60,7 +60,7 @@ export function PeakHoursChart({ data }) {
             <Bar
               dataKey="ventas"
               name="Ventas Esperadas"
-              radius={[4, 4, 0, 0]}
+              radius={[0, 4, 4, 0]}
               maxBarSize={40}
             >
               {chartData.map((entry, index) => (
