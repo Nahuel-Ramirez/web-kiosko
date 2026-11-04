@@ -19,7 +19,9 @@ class CierreCaja(Base):
 
     # Arqueo de caja (obligatorio al cerrar)
     monto_inicial = Column(Numeric(12, 2), nullable=False, default=0.00)
-    efectivo_contado = Column(Numeric(12, 2), nullable=False)
+    # Nullable como en init.sql: los cierres anteriores al arqueo no tienen conteo.
+    # La obligatoriedad al cerrar la valida CierreCajaCreate / create_cierre.
+    efectivo_contado = Column(Numeric(12, 2), nullable=True)
     # diferencia se calcula en la BD como GENERATED STORED: efectivo_contado - monto_inicial - total_efectivo
     # No incluir en el modelo ORM para evitar conflictos con INSERT (es generated column en PG)
     # Se accede via SQL raw o property en schema si se necesita

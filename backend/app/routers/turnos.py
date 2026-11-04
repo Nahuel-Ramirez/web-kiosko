@@ -40,6 +40,12 @@ def _inicio_del_dia(fecha: Optional[date]) -> Optional[datetime]:
     return datetime.combine(fecha, time.min).replace(tzinfo=ARG_TZ)
 
 
+def _con_zona(fecha: datetime) -> datetime:
+    """Las fechas sin zona (SQLite, o PostgreSQL sin migrar a TIMESTAMPTZ) se toman como UTC,
+    que es lo que guarda func.now(); asi se pueden comparar con los limites del dia en ARG_TZ."""
+    return fecha if fecha.tzinfo else fecha.replace(tzinfo=timezone.utc)
+
+
 def _fin_del_dia(fecha: Optional[date]) -> Optional[datetime]:
     if fecha is None:
         return None
@@ -158,9 +164,9 @@ def reporte_por_usuario(
 
     cierres = get_cierres_by_usuario(db, usuario_id)
     if fecha_desde_dt:
-        cierres = [c for c in cierres if c.fecha_cierre >= fecha_desde_dt]
+        cierres = [c for c in cierres if _con_zona(c.fecha_cierre) >= fecha_desde_dt]
     if fecha_hasta_dt:
-        cierres = [c for c in cierres if c.fecha_cierre <= fecha_hasta_dt]
+        cierres = [c for c in cierres if _con_zona(c.fecha_cierre) <= fecha_hasta_dt]
 
     usuario_obj = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario_obj:
