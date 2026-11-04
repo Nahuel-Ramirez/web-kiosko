@@ -226,13 +226,16 @@ export function AppProvider({ children }) {
     };
   }, []);
 
-  // El servidor asocia las ventas abiertas al cierre y calcula los totales.
-  const crearCierre = useCallback(async () => {
+  // El servidor asocia las ventas abiertas al cierre, calcula los totales y la
+  // diferencia del arqueo (efectivo contado - monto inicial - efectivo vendido).
+  const crearCierre = useCallback(async ({ montoInicial, efectivoContado }) => {
     const { cantidad } = await getTotalesDelTurno();
     if (cantidad === 0) {
       throw new Error('No hay ventas en este turno para cerrar');
     }
     return crearCierreRequest({
+      monto_inicial: Number(montoInicial || 0).toFixed(2),
+      efectivo_contado: Number(efectivoContado).toFixed(2),
       observaciones: `Cierre automático - ${new Date().toLocaleString('es-AR')}`
     });
   }, [getTotalesDelTurno]);
