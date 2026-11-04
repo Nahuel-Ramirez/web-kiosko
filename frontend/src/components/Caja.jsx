@@ -36,6 +36,10 @@ export function Caja() {
   const [cierreLoading, setCierreLoading] = useState(false);
   const [cierreError, setCierreError] = useState('');
   const [cierreExito, setCierreExito] = useState(false);
+  // Arqueo: con cuánto arrancó la caja y cuánto efectivo contó el cajero al cerrar.
+  const [montoInicial, setMontoInicial] = useState('');
+  const [efectivoContado, setEfectivoContado] = useState('');
+  const [ultimoCierre, setUltimoCierre] = useState(null);
   const [lastSale, setLastSale] = useState(null);
   const [showTicket, setShowTicket] = useState(false);
   const [turnoTotales, setTurnoTotales] = useState({
@@ -111,21 +115,31 @@ export function Caja() {
 
   const { totalEfectivo, totalTarjeta, totalTransferencia, cantidad, totalGeneral } = turnoTotales;
 
+  // Efectivo que debería haber en caja según el servidor más el monto inicial cargado.
+  const efectivoEsperado = Number(montoInicial || 0) + totalEfectivo;
+
   const handleCierre = async () => {
     if (cantidad === 0) {
       setCierreError('No hay ventas en este turno para cerrar');
       return;
     }
-    if (!window.confirm(`¿Cerrar caja?\nEfectivo: ${formatMoney(totalEfectivo)}\nTarjeta: ${formatMoney(totalTarjeta)}\nTransferencia: ${formatMoney(totalTransferencia)}\nVentas: ${cantidad}\nTotal: ${formatMoney(totalGeneral)}`)) {
+    if (efectivoContado === '' || Number(efectivoContado) < 0 || Number(montoInicial || 0) < 0) {
+      setCierreError('Para cerrar la caja ingresá el efectivo contado (y el monto inicial, si hubo).');
+      return;
+    }
+    if (!window.confirm(`¿Cerrar caja?\nEfectivo: ${formatMoney(totalEfectivo)}\nTarjeta: ${formatMoney(totalTarjeta)}\nTransferencia: ${formatMoney(totalTransferencia)}\nVentas: ${cantidad}\nTotal: ${formatMoney(totalGeneral)}\n\nMonto inicial: ${formatMoney(Number(montoInicial || 0))}\nEfectivo contado: ${formatMoney(Number(efectivoContado))}`)) {
       return;
     }
     setCierreLoading(true);
     setCierreError('');
     setCierreExito(false);
+    setUltimoCierre(null);
     try {
-      await crearCierre();
+      const cierre = await crearCierre({ montoInicial, efectivoContado });
+      setUltimoCierre(cierre);
       setCierreExito(true);
-      setTimeout(() => setCierreExito(false), 3000);
+      setMontoInicial('');
+      setEfectivoContado('');
     } catch (err) {
       setCierreError(err.message);
     } finally {
@@ -352,12 +366,50 @@ export function Caja() {
                   <strong>{formatMoney(totalGeneral)}</strong>
                 </div>
               </div>
+              <div className="payment-box">
+                <label>
+                  Monto inicial en caja
+                  <input
+                    id="montoInicial"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0"
+                    value={montoInicial}
+                    onChange={(e) => { setMontoInicial(e.target.value); setCierreError(''); }}
+                  />
+                </label>
+                <label>
+                  Efectivo contado <span className="required">*</span>
+                  <input
+                    id="efectivoContado"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0"
+                    value={efectivoContado}
+                    onChange={(e) => { setEfectivoContado(e.target.value); setCierreError(''); }}
+                  />
+                </label>
+                <div className="change-box">
+                  <span>Efectivo esperado</span>
+                  <strong>{formatMoney(efectivoEsperado)}</strong>
+                </div>
+              </div>
               {cierreError && <div className="form-message error">{cierreError}</div>}
-              {cierreExito && <div className="form-message success">Caja cerrada correctamente</div>}
+              {cierreExito && (
+                <div className="form-message success">
+                  Caja cerrada correctamente.
+                  {ultimoCierre && ultimoCierre.diferencia !== null && ultimoCierre.diferencia !== undefined && (
+                    <> Diferencia del arqueo: {formatMoney(Number(ultimoCierre.diferencia))}{' '}
+                      ({Number(ultimoCierre.diferencia) < 0 ? 'faltante' : Number(ultimoCierre.diferencia) > 0 ? 'sobrante' : 'sin diferencia'}).</>
+                  )}
+                </div>
+              )}
               <button
                 className="primary-btn full cierre-btn"
                 onClick={handleCierre}
-                disabled={cantidad === 0 || cierreLoading}
+                disabled={cantidad === 0 || cierreLoading || efectivoContado === ''}
               >
                 {cierreLoading ? 'Cerrando...' : 'Cerrar caja'}
               </button>
