@@ -1,10 +1,10 @@
-from datetime import datetime
+﻿from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-METODOS_PAGO_VALIDOS = {"EFECTIVO", "TARJETA", "TRANSFERENCIA"}
-ROLES_VALIDOS = {"ADMIN", "CAJERO"}
+METODOS_PAGO_VALIDOS = {'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'}
+ROLES_VALIDOS = {'ADMIN', 'CAJERO'}
 
 
 # ===== USUARIOS =====
@@ -15,12 +15,12 @@ class UsuarioBase(BaseModel):
     activo: bool = True
     dni: Optional[str] = None
 
-    @field_validator("rol")
+    @field_validator('rol')
     @classmethod
     def validar_rol(cls, valor: str) -> str:
         valor = valor.strip().upper()
         if valor not in ROLES_VALIDOS:
-            raise ValueError(f"rol invalido. Debe ser uno de {sorted(ROLES_VALIDOS)}")
+            raise ValueError(f'rol invalido. Debe ser uno de {sorted(ROLES_VALIDOS)}')
         return valor
 
 
@@ -36,14 +36,14 @@ class UsuarioUpdate(BaseModel):
     password: Optional[str] = None
     dni: Optional[str] = None
 
-    @field_validator("rol")
+    @field_validator('rol')
     @classmethod
     def validar_rol(cls, valor: Optional[str]) -> Optional[str]:
         if valor is None:
             return valor
         valor = valor.strip().upper()
         if valor not in ROLES_VALIDOS:
-            raise ValueError(f"rol invalido. Debe ser uno de {sorted(ROLES_VALIDOS)}")
+            raise ValueError(f'rol invalido. Debe ser uno de {sorted(ROLES_VALIDOS)}')
         return valor
 
 
@@ -132,14 +132,14 @@ class VentaBase(BaseModel):
     monto_recibido: Optional[Decimal] = None
     vuelto: Optional[Decimal] = None
 
-    @field_validator("metodo_pago")
+    @field_validator('metodo_pago')
     @classmethod
     def normalizar_metodo_pago(cls, valor: str) -> str:
         # Normaliza a mayusculas para que coincida con el CHECK de la base
         # (database/init.sql) y con las comparaciones de los reportes.
         valor = valor.strip().upper()
         if valor not in METODOS_PAGO_VALIDOS:
-            raise ValueError(f"metodo_pago invalido. Debe ser uno de {sorted(METODOS_PAGO_VALIDOS)}")
+            raise ValueError(f'metodo_pago invalido. Debe ser uno de {sorted(METODOS_PAGO_VALIDOS)}')
         return valor
 
 
@@ -164,6 +164,8 @@ class CierreCajaBase(BaseModel):
     total_transferencia: Decimal = Field(default=0, ge=0)
     cantidad_ventas: int = Field(default=0, ge=0)
     observaciones: Optional[str] = None
+    monto_inicial: Decimal = Field(default=0, ge=0)
+    efectivo_contado: Decimal = Field(ge=0)
 
 
 class CierreCajaCreate(CierreCajaBase):
@@ -177,34 +179,37 @@ class CierreCajaOut(CierreCajaBase):
     usuario_id: int
     fecha_cierre: datetime
     usuario_nombre: Optional[str] = None
+    # Los cierres anteriores al arqueo no tienen conteo de efectivo (NULL en la base).
+    efectivo_contado: Optional[Decimal] = None
+    diferencia: Optional[Decimal] = None
 
 
 # ===== REPORTES =====
 class ResumenTurno(BaseModel):
-    """Resumen de un turno/cierre de caja con detalle de ventas."""
+    '''Resumen de un turno/cierre de caja con detalle de ventas.'''
     cierre: CierreCajaOut
     ventas: List[VentaOut]
     total_general: Decimal
     total_efectivo: Decimal
     total_tarjeta: Decimal
-    total_transferencia: Decimal = Decimal("0")
+    total_transferencia: Decimal = Decimal('0')
     cantidad_ventas: int
 
 
 class TurnoActualOut(BaseModel):
-    """Ventas abiertas (sin cierre) del usuario y sus totales."""
+    '''Ventas abiertas (sin cierre) del usuario y sus totales.'''
     model_config = ConfigDict(from_attributes=True)
 
     cantidad_ventas: int
     total_efectivo: Decimal
     total_tarjeta: Decimal
-    total_transferencia: Decimal = Decimal("0")
+    total_transferencia: Decimal = Decimal('0')
     total_general: Decimal
     ventas: List[VentaOut] = []
 
 
 class VentasPorUsuario(BaseModel):
-    """Ventas agrupadas por usuario para reportes de admin."""
+    '''Ventas agrupadas por usuario para reportes de admin.'''
     usuario_id: int
     usuario_nombre: str
     usuario_username: str
@@ -212,32 +217,32 @@ class VentasPorUsuario(BaseModel):
     cantidad_ventas: int
     total_efectivo: Decimal
     total_tarjeta: Decimal
-    total_transferencia: Decimal = Decimal("0")
+    total_transferencia: Decimal = Decimal('0')
     cierres: List[CierreCajaOut] = []
 
 
 class ReporteVentasPeriodo(BaseModel):
-    """Reporte de ventas en un período (para admin)."""
+    '''Reporte de ventas en un periodo (para admin).'''
     fecha_desde: datetime
     fecha_hasta: datetime
     total_general: Decimal
     total_efectivo: Decimal
     total_tarjeta: Decimal
-    total_transferencia: Decimal = Decimal("0")
+    total_transferencia: Decimal = Decimal('0')
     cantidad_ventas: int
     por_usuario: List[VentasPorUsuario]
 
 
 # ===== CLIENTES (busqueda para el POS) =====
 class ClienteBusquedaOut(BaseModel):
-    """Forma que consume el frontend (ClientSearchInput): nombre + dni o cuit."""
+    '''Forma que consume el frontend (ClientSearchInput): nombre + dni o cuit.'''
     id: int
     nombre: str
     dni: Optional[str] = None
     cuit: Optional[str] = None
 
 
-# ===== REPORTES: PREDICCION DE DEMANDA / HU-09 =====
+# ===== REPORTES: prediccion DE DEMANDA / HU-09 =====
 class VentaHoraItem(BaseModel):
     hora: int
     ventas: int
@@ -261,7 +266,7 @@ class HoraPicoItem(BaseModel):
 
 
 class RecomendacionItem(BaseModel):
-    tipo: str  # "cajero" | "stock"
+    tipo: str  # 'cajero' | 'stock'
     mensaje: str
 
 
@@ -276,3 +281,5 @@ class ProductoMasVendido(BaseModel):
     codigo_barras: str
     cantidad_vendida: int
     total_vendido: Decimal
+
+

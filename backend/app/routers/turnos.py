@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+﻿from datetime import date, datetime, time, timezone, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -30,13 +30,26 @@ from app.services.core_service import (
 
 router = APIRouter(prefix="/api/turnos", tags=["turnos"])
 
+# Zona horaria Argentina (UTC-3)
+ARG_TZ = timezone(timedelta(hours=-3))
+
 
 def _inicio_del_dia(fecha: Optional[date]) -> Optional[datetime]:
-    return datetime.combine(fecha, time.min) if fecha else None
+    if fecha is None:
+        return None
+    return datetime.combine(fecha, time.min).replace(tzinfo=ARG_TZ)
+
+
+def _con_zona(fecha: datetime) -> datetime:
+    """Las fechas sin zona (SQLite, o PostgreSQL sin migrar a TIMESTAMPTZ) se toman como UTC,
+    que es lo que guarda func.now(); asi se pueden comparar con los limites del dia en ARG_TZ."""
+    return fecha if fecha.tzinfo else fecha.replace(tzinfo=timezone.utc)
 
 
 def _fin_del_dia(fecha: Optional[date]) -> Optional[datetime]:
-    return datetime.combine(fecha, time.max) if fecha else None
+    if fecha is None:
+        return None
+    return datetime.combine(fecha, time.max).replace(tzinfo=ARG_TZ)
 
 
 # ===== VENTAS (para cajeros) =====
@@ -151,9 +164,9 @@ def reporte_por_usuario(
 
     cierres = get_cierres_by_usuario(db, usuario_id)
     if fecha_desde_dt:
-        cierres = [c for c in cierres if c.fecha_cierre >= fecha_desde_dt]
+        cierres = [c for c in cierres if _con_zona(c.fecha_cierre) >= fecha_desde_dt]
     if fecha_hasta_dt:
-        cierres = [c for c in cierres if c.fecha_cierre <= fecha_hasta_dt]
+        cierres = [c for c in cierres if _con_zona(c.fecha_cierre) <= fecha_hasta_dt]
 
     usuario_obj = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario_obj:
@@ -170,3 +183,7 @@ def reporte_por_usuario(
         total_transferencia=total_transferencia,
         cierres=[CierreCajaOut.model_validate(c) for c in cierres],
     )
+
+
+
+
