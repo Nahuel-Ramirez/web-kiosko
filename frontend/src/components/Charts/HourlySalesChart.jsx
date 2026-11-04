@@ -35,20 +35,19 @@ export function HourlySalesChart({ data }) {
       <h4 className="chart-title">Ventas por Hora</h4>
       <div className="chart-wrapper">
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <BarChart data={chartData} layout="horizontal">
+            <CartesianGrid strokeDasharray="3 3" vertical={true} />
             <XAxis
-              type="number"
-              tickFormatter={(value) => formatMoney(value)}
-              tick={{ fontSize: 11 }}
-            />
-            <YAxis
               dataKey="hora"
               type="category"
-              width={60}
               tick={{ fontSize: 11 }}
               axisLine={false}
               tickLine={false}
+            />
+            <YAxis
+              type="number"
+              tickFormatter={(value) => formatMoney(value)}
+              tick={{ fontSize: 11 }}
             />
             <Tooltip
               formatter={(value, name) => [
@@ -62,14 +61,14 @@ export function HourlySalesChart({ data }) {
               dataKey="total"
               name="Total"
               fill="#2563eb"
-              radius={[0, 4, 4, 0]}
+              radius={[4, 4, 0, 0]}
               maxBarSize={40}
             />
             <Bar
               dataKey="ventas"
               name="Cantidad Ventas"
               fill="#10b981"
-              radius={[0, 4, 4, 0]}
+              radius={[4, 4, 0, 0]}
               maxBarSize={40}
             />
           </BarChart>
