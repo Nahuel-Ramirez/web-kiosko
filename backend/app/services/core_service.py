@@ -382,10 +382,18 @@ def _set_diferencia(db: Session, cierre: CierreCaja) -> None:
             cierre.diferencia = row[0]
         else:
             # Fallback: calcular en Python (para SQLite o si BD no tiene el dato)
-            cierre.diferencia = (cierre.efectivo_contado or 0) - (cierre.monto_inicial or 0) - (cierre.total_efectivo or 0)
+            cierre.diferencia = _calcular_diferencia(cierre)
     except Exception:
         # Columna no existe en BD (SQLite sin GENERATED column) -> calcular en Python
-        cierre.diferencia = (cierre.efectivo_contado or 0) - (cierre.monto_inicial or 0) - (cierre.total_efectivo or 0)
+        cierre.diferencia = _calcular_diferencia(cierre)
+
+
+def _calcular_diferencia(cierre: CierreCaja) -> Optional[Decimal]:
+    """Misma formula que la columna GENERATED de init.sql: sin conteo de efectivo (cierres
+    anteriores al arqueo) la diferencia es NULL, no un faltante por el total vendido."""
+    if cierre.efectivo_contado is None:
+        return None
+    return cierre.efectivo_contado - (cierre.monto_inicial or 0) - (cierre.total_efectivo or 0)
 
 def get_cierre(db: Session, cierre_id: int) -> Optional[CierreCaja]:
     cierre = db.query(CierreCaja).filter(CierreCaja.id == cierre_id).first()

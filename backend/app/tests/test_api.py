@@ -148,6 +148,46 @@ def test_venta_con_descuento_repartido_en_subtotales(client, cajero_h, producto)
     assert client.post("/api/turnos/ventas", headers=cajero_h, json=p).status_code == 201
 
 
+def _cierre_previo_al_arqueo(db, usuario_id):
+    """Cierre como los que quedaron en la base antes del arqueo: sin efectivo_contado."""
+    from app.models.cierre_caja import CierreCaja
+    c = CierreCaja(usuario_id=usuario_id, fecha_cierre=datetime.now(), total_efectivo=500,
+                   total_tarjeta=0, cantidad_ventas=2, monto_inicial=0, efectivo_contado=None)
+    db.add(c)
+    db.commit()
+    return c.id
+
+
+def test_cierres_previos_al_arqueo_no_rompen_listados(client, cajero_h, admin_h, db_session, producto):
+    cierre_id = _cierre_previo_al_arqueo(db_session, 2)  # 2 = cajero (conftest)
+    client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1))
+
+    r = client.get("/api/turnos/mis-cierres", headers=cajero_h)
+    assert r.status_code == 200, r.text
+    viejo = [c for c in r.json() if c["id"] == cierre_id][0]
+    # Sin conteo no hay diferencia: no debe aparecer un faltante igual al total vendido.
+    assert viejo["efectivo_contado"] is None and viejo["diferencia"] is None
+
+    assert client.get("/api/turnos/cierre/%s" % cierre_id, headers=cajero_h).status_code == 200
+
+    desde = date.fromordinal(date.today().toordinal() - 1).isoformat()
+    hasta = date.fromordinal(date.today().toordinal() + 1).isoformat()
+    rango = {"fecha_desde": desde, "fecha_hasta": hasta}
+    r = client.get("/api/turnos/reporte/periodo", headers=admin_h, params=rango)
+    assert r.status_code == 200, r.text
+    assert any(c["id"] == cierre_id for u in r.json()["por_usuario"] for c in u["cierres"])
+    r = client.get("/api/turnos/reporte/usuario/2", headers=admin_h, params=rango)
+    assert r.status_code == 200, r.text
+
+
+def test_cierre_nuevo_sigue_exigiendo_arqueo(client, cajero_h, producto):
+    client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1))
+    assert client.post("/api/turnos/cierre", headers=cajero_h, json={"observaciones": "x"}).status_code == 422
+    r = client.post("/api/turnos/cierre", headers=cajero_h, json={"monto_inicial": 100, "efectivo_contado": 270})
+    assert r.status_code == 201, r.text
+    assert float(r.json()["diferencia"]) == -10  # 270 - 100 - 180
+
+
 def test_cierre_sin_ventas_en_base_conserva_payload_legacy(client, cajero_h):
     r = client.post("/api/turnos/cierre", headers=cajero_h, json={"total_efectivo": 100, "total_tarjeta": 50, "cantidad_ventas": 3, "efectivo_contado": 150})
     assert r.status_code == 201 and r.json()["cantidad_ventas"] == 3

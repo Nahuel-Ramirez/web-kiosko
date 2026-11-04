@@ -179,6 +179,8 @@ class CierreCajaOut(CierreCajaBase):
     usuario_id: int
     fecha_cierre: datetime
     usuario_nombre: Optional[str] = None
+    # Los cierres anteriores al arqueo no tienen conteo de efectivo (NULL en la base).
+    efectivo_contado: Optional[Decimal] = None
     diferencia: Optional[Decimal] = None
 
 
