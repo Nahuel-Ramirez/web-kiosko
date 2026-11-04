@@ -188,6 +188,23 @@ def test_cierre_nuevo_sigue_exigiendo_arqueo(client, cajero_h, producto):
     assert float(r.json()["diferencia"]) == -10  # 270 - 100 - 180
 
 
+def test_cajero_ve_solo_su_reporte(client, cajero_h, admin_h, producto):
+    client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 2))
+    hoy = date.today().isoformat()
+    rango = {"fecha_desde": hoy, "fecha_hasta": hoy}
+
+    r = client.get("/api/turnos/reporte/usuario/2", headers=cajero_h, params=rango)  # 2 = cajero
+    assert r.status_code == 200, r.text
+    assert r.json()["cantidad_ventas"] == 1 and float(r.json()["total_ventas"]) == 360
+
+    # no puede ver el de otro usuario ni el reporte general
+    r = client.get("/api/turnos/reporte/usuario/1", headers=cajero_h, params=rango)
+    assert r.status_code == 403 and r.json()["detail"] == "Solo podés ver tu propio reporte"
+    assert client.get("/api/turnos/reporte/periodo", headers=cajero_h, params=rango).status_code == 403
+    # el admin sigue viendo el de cualquiera
+    assert client.get("/api/turnos/reporte/usuario/2", headers=admin_h, params=rango).status_code == 200
+
+
 def test_cierre_sin_ventas_en_base_conserva_payload_legacy(client, cajero_h):
     r = client.post("/api/turnos/cierre", headers=cajero_h, json={"total_efectivo": 100, "total_tarjeta": 50, "cantidad_ventas": 3, "efectivo_contado": 150})
     assert r.status_code == 201 and r.json()["cantidad_ventas"] == 3
