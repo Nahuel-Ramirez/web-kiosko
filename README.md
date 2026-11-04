@@ -119,6 +119,36 @@ Entrega final del TP: 12-11.
 | Tomas Alvarez | DBA |
 | Franco Elias Ayala | Tester |
 
+## Cómo levantar el proyecto en tu PC
+
+Cada integrante corre la app en su propia PC, con su propia base PostgreSQL. El código se comparte por GitHub; los datos no: para que todos veamos lo mismo, cada uno carga los mismos **datos de ejemplo**.
+
+1. **Código:** `git clone https://github.com/Nahuel-Ramirez/web-kiosko.git` (o `git pull origin main` si ya lo tenés).
+2. **Base de datos:** crear una base vacía en PostgreSQL y aplicarle `database/init.sql`. Se puede volver a correr sobre una base existente para traer cambios nuevos sin perder datos.
+3. **Backend** (desde `backend/`):
+   ```
+   python -m venv venv && venv\Scripts\activate
+   pip install -r requirements.txt
+   copy .env.example .env          # poner tu DATABASE_URL (postgresql://usuario:clave@localhost:5432/base)
+   python -m app.db.seed           # usuarios admin/admin123 y cajero/cajero123, y Consumidor Final
+   python -m app.db.demo           # datos de ejemplo (opcional)
+   uvicorn app.main:app --reload   # http://localhost:8000/docs
+   ```
+4. **Frontend** (desde `frontend/`): `npm install` y `npm run dev` → http://localhost:5173
+
+### Datos de ejemplo
+
+`python -m app.db.demo` carga datos **ficticios** para mostrar la app:
+- 32 productos de kiosco (algunos con stock bajo) y 10 clientes.
+- Ventas de los últimos 30 días con picos al mediodía y a la tarde.
+- Un cierre de caja con arqueo por día y cajero.
+- Las ventas de hoy quedan abiertas, para probar el cierre de caja.
+
+Todos obtienen los mismos datos; las fechas se calculan a partir del día en que se cargan.
+
+- No se carga dos veces: si ya hay datos de ejemplo, avisa.
+- `python -m app.db.demo --borrar` los elimina, junto con cualquier venta que incluya un producto o cliente de ejemplo. Los productos, clientes y ventas propios no se tocan.
+
 ## Cómo contribuir
 
 Ver la guía **"Cómo clonar y pushear al repositorio"** (carpeta del proyecto) para el flujo de trabajo en Git que usa el equipo: ramas, commits y pull requests.
