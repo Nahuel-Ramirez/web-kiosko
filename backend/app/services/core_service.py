@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from sqlalchemy import func, and_
@@ -321,13 +321,18 @@ def get_turno_actual(db: Session, usuario_id: int) -> dict:
 
 
 def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> CierreCaja:
-    """Cierra el turno del usuario.
+    """Cierra el turno del usuario con arqueo de caja obligatorio.
 
     Si hay ventas abiertas registradas en la base, las asocia al cierre y los
     totales se calculan en el servidor (no se confia en lo que manda el cliente).
     Si no hay ventas abiertas se conservan los totales enviados (compatibilidad
     con el frontend que aun calcula el turno de forma local).
+
+    El arqueo (monto_inicial, efectivo_contado) es obligatorio.
+    La diferencia se calcula en la BD: efectivo_contado - monto_inicial - total_efectivo
     """
+    import sys
+    print("DEBUG service: datos.monto_inicial=" + str(datos.monto_inicial) + ", datos.efectivo_contado=" + str(datos.efectivo_contado), file=sys.stderr, flush=True)
     ventas = get_ventas_abiertas(db, usuario_id)
     if ventas:
         total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
@@ -337,6 +342,11 @@ def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> Cier
         total_transferencia = datos.total_transferencia
         cantidad = datos.cantidad_ventas
 
+    # Validar arqueo obligatorio
+    if datos.efectivo_contado is None:
+        from app.services.core_service import ReglaNegocioError
+        raise ReglaNegocioError("El arqueo de caja es obligatorio: debe indicar efectivo_contado", status_code=400)
+
     cierre = CierreCaja(
         usuario_id=usuario_id,
         total_efectivo=total_efectivo,
@@ -344,6 +354,8 @@ def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> Cier
         total_transferencia=total_transferencia,
         cantidad_ventas=cantidad,
         observaciones=datos.observaciones,
+        monto_inicial=datos.monto_inicial,
+        efectivo_contado=datos.efectivo_contado,
     )
     try:
         db.add(cierre)
@@ -355,15 +367,39 @@ def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> Cier
         db.rollback()
         raise
     db.refresh(cierre)
+    # Poblar diferencia: intentar leer de BD (PostgreSQL), si falla calcular en Python (SQLite)
+    _set_diferencia(db, cierre)
     return cierre
 
 
+def _set_diferencia(db: Session, cierre: CierreCaja) -> None:
+    """Intenta leer 'diferencia' de la BD; si la columna no existe (SQLite), la calcula en Python."""
+    from sqlalchemy import text
+    try:
+        result = db.execute(text("SELECT diferencia FROM cierres_caja WHERE id = :id"), {"id": cierre.id})
+        row = result.fetchone()
+        if row and row[0] is not None:
+            cierre.diferencia = row[0]
+        else:
+            # Fallback: calcular en Python (para SQLite o si BD no tiene el dato)
+            cierre.diferencia = (cierre.efectivo_contado or 0) - (cierre.monto_inicial or 0) - (cierre.total_efectivo or 0)
+    except Exception:
+        # Columna no existe en BD (SQLite sin GENERATED column) -> calcular en Python
+        cierre.diferencia = (cierre.efectivo_contado or 0) - (cierre.monto_inicial or 0) - (cierre.total_efectivo or 0)
+
 def get_cierre(db: Session, cierre_id: int) -> Optional[CierreCaja]:
-    return db.query(CierreCaja).filter(CierreCaja.id == cierre_id).first()
+    cierre = db.query(CierreCaja).filter(CierreCaja.id == cierre_id).first()
+    if cierre:
+        _set_diferencia(db, cierre)
+    return cierre
 
 
 def get_cierres_by_usuario(db: Session, usuario_id: int) -> List[CierreCaja]:
-    return db.query(CierreCaja).filter(CierreCaja.usuario_id == usuario_id).order_by(CierreCaja.fecha_cierre.desc()).all()
+    cierres = db.query(CierreCaja).filter(CierreCaja.usuario_id == usuario_id).order_by(CierreCaja.fecha_cierre.desc()).all()
+    # Poblar diferencia en cada cierre
+    for c in cierres:
+        _set_diferencia(db, c)
+    return cierres
 
 
 def get_ultimo_cierre_abierto(db: Session, usuario_id: int) -> Optional[CierreCaja]:
@@ -380,6 +416,8 @@ def get_resumen_turno(db: Session, cierre_id: int) -> Optional[ResumenTurno]:
     cierre = get_cierre(db, cierre_id)
     if not cierre:
         return None
+
+    # get_cierre ya llama a _set_diferencia
 
     ventas = get_ventas_by_cierre(db, cierre_id)
 
@@ -400,7 +438,7 @@ def get_resumen_turno(db: Session, cierre_id: int) -> Optional[ResumenTurno]:
 def get_reporte_ventas_periodo(
     db: Session, fecha_desde: datetime, fecha_hasta: datetime
 ) -> ReporteVentasPeriodo:
-    # Ventas en el período
+    # Ventas en el per�odo
     ventas = (
         db.query(Venta)
         .options(joinedload(Venta.usuario))
@@ -433,13 +471,16 @@ def get_reporte_ventas_periodo(
         else:
             por_usuario_dict[uid]["total_tarjeta"] += v.total
 
-    # Cierres en el período
+    # Cierres en el per�odo
     cierres = (
         db.query(CierreCaja)
         .options(joinedload(CierreCaja.usuario))
         .filter(CierreCaja.fecha_cierre >= fecha_desde, CierreCaja.fecha_cierre <= fecha_hasta)
         .all()
     )
+    # Poblar diferencia en cada cierre
+    for c in cierres:
+        _set_diferencia(db, c)
     for c in cierres:
         uid = c.usuario_id
         if uid in por_usuario_dict:
@@ -460,3 +501,11 @@ def get_reporte_ventas_periodo(
         cantidad_ventas=len(ventas),
         por_usuario=por_usuario,
     )
+
+
+
+
+
+
+
+

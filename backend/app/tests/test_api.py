@@ -1,4 +1,4 @@
-from datetime import date, datetime
+﻿from datetime import date, datetime
 
 from app.models.venta import Venta
 
@@ -112,7 +112,7 @@ def test_cierre_vincula_ventas_y_calcula_en_servidor(client, cajero_h, admin_h, 
     assert turno["cantidad_ventas"] == 2 and float(turno["total_general"]) == 540
 
     # el cliente intenta mentir con los totales: el servidor los ignora
-    r = client.post("/api/turnos/cierre", headers=cajero_h, json={"total_efectivo": 99999, "total_tarjeta": 0, "cantidad_ventas": 50})
+    r = client.post("/api/turnos/cierre", headers=cajero_h, json={"total_efectivo": 99999, "total_tarjeta": 0, "cantidad_ventas": 50, "efectivo_contado": 360})
     assert r.status_code == 201
     c = r.json()
     assert float(c["total_efectivo"]) == 360 and float(c["total_tarjeta"]) == 180 and c["cantidad_ventas"] == 2
@@ -130,7 +130,7 @@ def test_transferencia_tiene_total_propio_en_turno_cierre_y_reporte(client, caje
     assert float(turno["total_transferencia"]) == 360 and float(turno["total_tarjeta"]) == 180
     assert float(turno["total_general"]) == 720
 
-    c = client.post("/api/turnos/cierre", headers=cajero_h, json={}).json()
+    c = client.post("/api/turnos/cierre", headers=cajero_h, json={"efectivo_contado": 720}).json()
     assert float(c["total_transferencia"]) == 360 and float(c["total_tarjeta"]) == 180 and float(c["total_efectivo"]) == 180
 
     hoy = date.today().isoformat()
@@ -149,7 +149,7 @@ def test_venta_con_descuento_repartido_en_subtotales(client, cajero_h, producto)
 
 
 def test_cierre_sin_ventas_en_base_conserva_payload_legacy(client, cajero_h):
-    r = client.post("/api/turnos/cierre", headers=cajero_h, json={"total_efectivo": 100, "total_tarjeta": 50, "cantidad_ventas": 3})
+    r = client.post("/api/turnos/cierre", headers=cajero_h, json={"total_efectivo": 100, "total_tarjeta": 50, "cantidad_ventas": 3, "efectivo_contado": 150})
     assert r.status_code == 201 and r.json()["cantidad_ventas"] == 3
 
 
@@ -240,3 +240,5 @@ def test_productos_mas_vendidos(client, cajero_h, admin_h, producto):
     rank = client.get("/api/reportes/productos-mas-vendidos?limite=5", headers=admin_h).json()
     assert [(r["nombre"], r["cantidad_vendida"]) for r in rank] == [("Alfajor", 5), ("Gaseosa 500ml", 2)]
     assert float(rank[0]["total_vendido"]) == 500
+
+

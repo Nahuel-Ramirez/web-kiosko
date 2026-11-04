@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+﻿from datetime import date, datetime, time, timezone, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -30,13 +30,20 @@ from app.services.core_service import (
 
 router = APIRouter(prefix="/api/turnos", tags=["turnos"])
 
+# Zona horaria Argentina (UTC-3)
+ARG_TZ = timezone(timedelta(hours=-3))
+
 
 def _inicio_del_dia(fecha: Optional[date]) -> Optional[datetime]:
-    return datetime.combine(fecha, time.min) if fecha else None
+    if fecha is None:
+        return None
+    return datetime.combine(fecha, time.min).replace(tzinfo=ARG_TZ)
 
 
 def _fin_del_dia(fecha: Optional[date]) -> Optional[datetime]:
-    return datetime.combine(fecha, time.max) if fecha else None
+    if fecha is None:
+        return None
+    return datetime.combine(fecha, time.max).replace(tzinfo=ARG_TZ)
 
 
 # ===== VENTAS (para cajeros) =====
@@ -170,3 +177,7 @@ def reporte_por_usuario(
         total_transferencia=total_transferencia,
         cierres=[CierreCajaOut.model_validate(c) for c in cierres],
     )
+
+
+
+
