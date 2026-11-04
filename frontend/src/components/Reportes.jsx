@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchReportePeriodo, fetchReportePorUsuario, fetchUsuarios } from '../services/reportService';
+import { fetchCurrentUser } from '../services/authService';
 
 function descargarCSV(nombreArchivo, filas, encabezados) {
   const csv = [
@@ -41,10 +42,16 @@ export function Reportes() {
   const isAdmin = currentUser?.role === 'Administrador';
 
   useEffect(() => {
+    if (!currentUser) return;
     if (isAdmin) {
       fetchUsuarios().then(setUsuarios).catch(() => {});
+      return;
     }
-  }, [isAdmin]);
+    // El cajero solo puede ver su propio reporte: lo identificamos con /api/auth/me.
+    fetchCurrentUser(currentUser.token)
+      .then((usuario) => setSelectedUsuarioId(String(usuario.id)))
+      .catch((err) => setError(err.message));
+  }, [isAdmin, currentUser]);
 
   const cargarReporteGeneral = async () => {
     setLoading(true);
@@ -80,8 +87,11 @@ export function Reportes() {
   };
 
   useEffect(() => {
-    cargarReporteGeneral();
-  }, [fechaDesde, fechaHasta]);
+    // el reporte general es solo para ADMIN
+    if (isAdmin && !selectedUsuarioId) {
+      cargarReporteGeneral();
+    }
+  }, [fechaDesde, fechaHasta, isAdmin, selectedUsuarioId]);
 
   useEffect(() => {
     if (selectedUsuarioId) {
@@ -169,7 +179,11 @@ export function Reportes() {
             </div>
           )}
           <div className="filter-group">
-            <button className="primary-btn" onClick={cargarReporteGeneral} disabled={loading}>
+            <button
+              className="primary-btn"
+              onClick={selectedUsuarioId ? cargarReporteUsuario : cargarReporteGeneral}
+              disabled={loading}
+            >
               {loading ? 'Cargando...' : 'Actualizar'}
             </button>
           </div>

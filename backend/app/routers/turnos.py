@@ -150,9 +150,17 @@ def reporte_por_usuario(
     fecha_desde: Optional[date] = Query(None, description="YYYY-MM-DD, incluye todo el dia"),
     fecha_hasta: Optional[date] = Query(None, description="YYYY-MM-DD, incluye todo el dia"),
     db: Session = Depends(get_db),
-    _: Usuario = Depends(solo_admin),
+    usuario: Usuario = Depends(get_current_user),
 ):
-    """Reporte de ventas de un usuario específico en un período (solo ADMIN)."""
+    """Reporte de ventas de un usuario en un período.
+
+    ADMIN puede ver el de cualquier usuario; un CAJERO, solo el suyo.
+    """
+    if usuario.rol != "ADMIN" and usuario.id != usuario_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo podés ver tu propio reporte",
+        )
     fecha_desde_dt = _inicio_del_dia(fecha_desde)
     fecha_hasta_dt = _fin_del_dia(fecha_hasta)
     ventas = get_ventas_by_usuario(db, usuario_id, fecha_desde_dt, fecha_hasta_dt)
