@@ -114,10 +114,8 @@ Entrega final del TP: 12-11.
 | Cassian Damiano Ochoa | Scrum Master |
 | Santiago Daniel Bruno | Lead Frontend |
 | Lautaro Ramiro Leguizamón | Lead Backend |
-| Gustavo Hugo Amaya | Frontend |
 | Marcos Joaquin Jara | Backend |
 | Tomas Alvarez | DBA |
-| Franco Elias Ayala | Tester |
 
 ## Cómo levantar el proyecto en tu PC
 
