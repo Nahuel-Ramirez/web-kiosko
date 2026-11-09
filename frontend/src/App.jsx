@@ -10,6 +10,7 @@ import { Cajeros } from './components/Cajeros';
 import { Caja } from './components/Caja';
 import { Reportes } from './components/Reportes';
 import { PrediccionDemanda } from './components/PrediccionDemanda';
+import { Clientes } from './components/Clientes';
 import { getStockStatus, getStockTagClass } from './utils/stock';
 
 // En true muestra LoginVisual (mockup sin backend). En false usa el login
@@ -46,6 +47,8 @@ function AppContent() {
         return <Reportes />;
       case 'prediccion':
         return isAdmin ? <PrediccionDemanda /> : <Caja />;
+      case 'clientes':
+        return <Clientes />;
       default:
         return <Dashboard />;
     }
@@ -67,6 +70,7 @@ function AppContent() {
                   {activePanel === 'caja' && 'Caja'}
                   {activePanel === 'reportes' && 'Reportes'}
                   {activePanel === 'prediccion' && 'Predicción de Demanda'}
+                  {activePanel === 'clientes' && 'Clientes'}
                 </h2>
               </div>
               <div className="topbar-actions">

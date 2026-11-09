@@ -37,3 +37,30 @@ export async function crearCliente(datos) {
   }
   return response.json();
 }
+
+export async function editarCliente(id, datos) {
+  const response = await fetch(`${API_URL}/api/clientes/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(datos),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Error al editar cliente');
+  }
+  return response.json();
+}
+
+export async function eliminarCliente(id) {
+  const response = await fetch(`${API_URL}/api/clientes/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Error al eliminar cliente');
+  }
+}

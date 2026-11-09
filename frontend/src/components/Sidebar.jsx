@@ -11,6 +11,7 @@ export function Sidebar({ activePanel, setActivePanel }) {
     { id: 'caja', label: 'Caja' },
     { id: 'reportes', label: 'Reportes' },
     { id: 'prediccion', label: 'Predicción', adminOnly: true },
+    { id: 'clientes', label: 'Clientes' },
   ];
 
   const filteredNav = navItems.filter(item => !item.adminOnly || isAdmin);
