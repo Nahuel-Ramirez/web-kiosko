@@ -1262,6 +1262,7 @@ input, select {
 
 .recomendaciones-section {
   margin-top: 2rem;
+  margin-bottom: 1rem;
 }
 
 .recomendaciones-grid {
@@ -1497,6 +1498,7 @@ kbd {
 
 .recomendaciones-section {
   margin-top: 2rem;
+  margin-bottom: 1rem;
 }
 
 .recomendaciones-grid {
@@ -1732,6 +1734,7 @@ kbd {
 
 .recomendaciones-section {
   margin-top: 2rem;
+  margin-bottom: 1rem;
 }
 
 .recomendaciones-grid {
@@ -1967,6 +1970,7 @@ kbd {
 
 .recomendaciones-section {
   margin-top: 2rem;
+  margin-bottom: 1rem;
 }
 
 .recomendaciones-grid {
@@ -2288,6 +2292,96 @@ kbd {
   gap: 0.5rem;
   align-items: stretch;
   flex-wrap: wrap;
+}
+
+/* ===== ALERTAS POPUP (topbar) ===== */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.alertas-trigger {
+  background: #e2e8f0;
+  color: var(--text);
+  border: 0;
+  border-radius: 10px;
+  padding: 0.55rem 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.alertas-trigger:hover {
+  background: #cbd5e1;
+}
+
+.alertas-popup {
+  position: fixed;
+  top: 100px;
+  right: 1.5rem;
+  width: min(360px, 92vw);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+.alertas-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.alertas-popup-header strong {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.alertas-close {
+  background: transparent;
+  border: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 0.4rem;
+  border-radius: 6px;
+}
+.alertas-close:hover {
+  background: #f1f5f9;
+  color: var(--text);
+}
+
+.alertas-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.alertas-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.alertas-item:last-child {
+  border-bottom: none;
+}
+.alertas-item div strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.alertas-item div small {
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .card-header .search-box > * {

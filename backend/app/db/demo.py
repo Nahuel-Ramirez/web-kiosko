@@ -51,9 +51,64 @@ PRODUCTOS = [
     ("Leche entera 1 L", 1100, 1800, 60), ("Pilas AA x2", 1800, 3200, 22),
     ("Encendedor", 600, 1200, 3), ("Panuelos descartables", 500, 1000, 75),
     ("Preservativos x3", 1700, 3000, 15), ("Helado palito agua", 500, 1100, 48),
+    ("Gaseosa de uva 500 ml", 1200, 2000, 88), ("Gaseosa de manzana 500 ml", 1200, 2000, 70),
+    ("Agua mineral sin gas 1,5 L", 900, 1500, 65), ("Agua mineral con gas 500 ml", 750, 1400, 55),
+    ("Jugo de manzana 1 L", 1400, 2400, 35), ("Jugo de multifruta 1 L", 1450, 2500, 33),
+    ("Te helado durazno 500 ml", 1100, 1900, 60), ("Te helado limon 500 ml", 1050, 1850, 62),
+    ("Cerveza rubia 1 L", 1600, 2800, 40), ("Cerveza negra 1 L", 1700, 3000, 28),
+    ("Vino tinto 750 ml", 2500, 4200, 20), ("Vino blanco 750 ml", 2400, 4000, 22),
+    ("Sidra 1 L", 1300, 2300, 30), ("Aguardiente 200 ml", 3000, 5000, 10),
+    ("Ron blanco 750 ml", 3500, 5500, 8), ("Whisky 750 ml", 5000, 8500, 5),
+    ("Gancia 750 ml", 1800, 3200, 15), ("Campari 750 ml", 2200, 3800, 7),
+    ("Alfajor de dulce de leche", 700, 1300, 100), ("Alfajor de chocolate negro", 800, 1400, 90),
+    ("Bombon de chocolate", 400, 800, 140), ("Caramelo duro x20", 300, 700, 110),
+    ("Chicle de frutilla", 400, 850, 120), ("Galletitas de coco 150 g", 850, 1500, 48),
+    ("Galletitas integrales 200 g", 950, 1650, 40), ("Galletitas rellenas chocolate", 1100, 1900, 35),
+    ("Galletitas saladas soda", 700, 1300, 60), ("Papas fritas bbq 90 g", 1400, 2400, 50),
+    ("Papas fritas crema cebolla 90 g", 1400, 2400, 45), ("Mani con piel 100 g", 600, 1100, 70),
+    ("Mani cubierto chocolate", 900, 1600, 25), ("Almendras tostadas 80 g", 1200, 2200, 15),
+    ("Nueces de la india 50 g", 1500, 2800, 6), ("Barrita de proteinas", 600, 1200, 80),
+    ("Barrita de frutos secos", 700, 1300, 45), ("Helado palito crema", 600, 1200, 40),
+    ("Helado palito chocolate", 650, 1300, 38), ("Helado pote 1/4 kg", 1800, 3200, 18),
+    ("Leche descremada 1 L", 1050, 1700, 50), ("Yogur de fruta 150 g", 500, 950, 55),
+    ("Yogur natural 500 g", 700, 1300, 40), ("Queso cremoso 200 g", 1400, 2400, 12),
+    ("Jamon cocido 100 g", 1200, 2100, 8), ("Salame 100 g", 1500, 2600, 9),
+    ("Queso rallado 100 g", 1100, 1900, 20), ("Mermelada de frutilla 350 g", 1600, 2700, 14),
+    ("Dulce de leche 500 g", 1500, 2600, 25), ("Miel de abejas 500 g", 1800, 3000, 10),
+    ("Azucar 1 kg", 600, 1100, 30), ("Edulcorante sobre x50", 900, 1600, 20),
+    ("Cafe molido 250 g", 2200, 3800, 12), ("Te en bolsitas x20", 700, 1300, 25),
+    ("Mate cocido 250 g", 800, 1400, 18), ("Soda en sifon 1 L", 1100, 1900, 16),
+    ("Agua tonica 500 ml", 1000, 1700, 22), ("Agua de soda 500 ml", 900, 1500, 24),
+    ("Agua de coco 500 ml", 900, 1600, 18), ("Limonada 500 ml", 800, 1400, 20),
+    ("Jarabe de chocolate", 1200, 2100, 10), ("Salsa de tomate 350 g", 900, 1500, 15),
+    ("Mayonesa 250 g", 1100, 1900, 12), ("Mostaza 250 g", 800, 1400, 10),
+    ("Ketchup 350 g", 950, 1600, 14), ("Aceite girasol 900 ml", 2200, 3800, 8),
+    ("Vinagre alcohol 500 ml", 700, 1200, 10), ("Sal gruesa 1 kg", 400, 800, 25),
+    ("Fideos espagueti 500 g", 900, 1500, 18), ("Arroz blanco 1 kg", 1100, 1900, 20),
+    ("Harina 000 1 kg", 700, 1200, 16), ("Azucar morena 1 kg", 700, 1200, 14),
+    ("Pan de molde", 1200, 2000, 10), ("Galletas de agua salada", 600, 1100, 20),
+    ("Galletas dulces de fruta", 700, 1200, 15), ("Gaseosa de frutilla 1,5 L", 2000, 3400, 28),
+    ("Gaseosa de uva 1,5 L", 2000, 3400, 26), ("Gaseosa de manzana 1,5 L", 2000, 3400, 24),
+    ("Gaseosa de pomelo 1,5 L", 2000, 3400, 22), ("Cerveza rubia 750 ml", 1200, 2100, 32),
+    ("Cerveza negra 750 ml", 1300, 2200, 24), ("Vino tinto 1 L", 3200, 5200, 10),
+    ("Vino blanco 1 L", 3100, 5000, 12), ("Espumante 750 ml", 2800, 4600, 7),
+    ("Gancia 1 L", 2400, 4000, 14), ("Ron blanco 1 L", 4500, 7200, 5),
+    ("Whisky 1 L", 6500, 10500, 4), ("Aguardiente 500 ml", 4500, 7500, 8),
 ]
 # probabilidad relativa de que se venda cada producto (mismo orden que PRODUCTOS)
-POPULARIDAD = [9, 6, 3, 8, 4, 3, 3, 3, 7, 9, 6, 5, 3, 5, 4, 3, 4, 3, 5, 3, 3, 4, 3, 7, 2, 2, 3, 1, 2, 2, 1, 3]
+POPULARIDAD = [9, 6, 3, 8, 4, 3, 3, 3, 7, 9,
+               6, 5, 3, 5, 4, 3, 4, 3, 5, 3,
+               3, 4, 3, 7, 2, 2, 3, 1, 2, 2,
+               1, 3,
+               5, 5, 4, 3, 4, 3, 4, 5, 3, 3,
+               3, 2, 3, 4, 4, 3, 2, 3, 4, 4,
+               3, 2, 2, 4, 5, 3, 4, 5, 4, 3,
+               3, 4, 3, 3, 4, 3, 4, 3, 2, 3,
+               4, 3, 3, 2, 4, 4, 3, 3, 2, 4,
+               3, 4, 3, 3, 4, 2, 3, 3, 4, 3,
+               4, 2, 4, 4, 3, 3, 2, 4, 3, 4,
+               3, 2, 3, 4, 3, 3, 3, 4, 3, 3,
+               2, 4, 4, 3, 3, 2]
 
 # dni/cuit, nombre, domicilio, telefono (todos inventados)
 CLIENTES = [
@@ -145,7 +200,7 @@ def cargar(db: Session, dias: int = 30, ahora: Optional[datetime] = None) -> Dic
                                                  precio_unitario=precio, subtotal=precio * cantidad))
                     total += precio * cantidad
 
-                metodo = rnd.choices(["EFECTIVO", "TARJETA", "TRANSFERENCIA"], [55, 28, 17])[0]
+                metodo = rnd.choices(["EFECTIVO", "TARJETA"], [65, 35])[0]
                 recibido = _pago_en_efectivo(rnd, total) if metodo == "EFECTIVO" else total
                 cliente_id = rnd.choice(clientes).id if rnd.random() < 0.2 else consumidor_final.id
                 venta = Venta(usuario_id=cajero, cliente_id=cliente_id, fecha=fecha, total=total,

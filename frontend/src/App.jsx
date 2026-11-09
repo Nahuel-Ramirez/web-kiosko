@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
 import { Login } from './components/Login';
@@ -9,6 +10,7 @@ import { Cajeros } from './components/Cajeros';
 import { Caja } from './components/Caja';
 import { Reportes } from './components/Reportes';
 import { PrediccionDemanda } from './components/PrediccionDemanda';
+import { getStockStatus, getStockTagClass } from './utils/stock';
 
 // En true muestra LoginVisual (mockup sin backend). En false usa el login
 // real, conectado a la API (ver src/services/authService.js).
@@ -16,7 +18,9 @@ const DEMO_MODE = false;
 
 function AppContent() {
   const { currentUser, loading } = useAuth();
-  const { activePanel, setActivePanel } = useApp();
+  const { activePanel, setActivePanel, getLowStockProducts } = useApp();
+  const [alertasOpen, setAlertasOpen] = useState(false);
+  const lowStockProducts = getLowStockProducts();
 
   if (loading) {
     return null;
@@ -63,6 +67,36 @@ function AppContent() {
                 {activePanel === 'reportes' && 'Reportes'}
                 {activePanel === 'prediccion' && 'Predicción de Demanda'}
               </h2>
+            </div>
+            <div className="topbar-actions">
+              <button
+                className="alertas-trigger"
+                aria-label="Alertas de stock"
+                onClick={() => setAlertasOpen(!alertasOpen)}
+              >
+                🔔{lowStockProducts.length > 0 ? ` (${lowStockProducts.length})` : ''}
+              </button>
+              {alertasOpen && lowStockProducts.length > 0 && (
+                <div className="alertas-popup">
+                  <div className="alertas-popup-header">
+                    <strong>Alertas de stock</strong>
+                    <button className="alertas-close" onClick={() => setAlertasOpen(false)}>×</button>
+                  </div>
+                  <ul className="alertas-list">
+                    {lowStockProducts.map(item => (
+                      <li key={item.id} className="alertas-item">
+                        <div>
+                          <strong>{item.name}</strong>
+                          <small>Stock: {item.stock}</small>
+                        </div>
+                        <span className={`stock-tag ${getStockTagClass(item.stock)}`}>
+                          {getStockStatus(item.stock).label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </header>
           {renderPanel()}

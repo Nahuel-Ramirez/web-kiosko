@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getStockStatus, getStockTagClass } from '../utils/stock';
 import { obtenerMisVentas } from '../services/turnoService';
 import { fetchReportePeriodo } from '../services/reportService';
+import { fetchHorasPico } from '../services/prediccionService';
 
 const METODO_ETIQUETA = { EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia' };
 
@@ -19,6 +20,7 @@ export function Dashboard() {
   const [ventasHoy, setVentasHoy] = useState([]);
   const [resumenHoy, setResumenHoy] = useState({ cantidad: 0, total: 0 });
   const [ventasError, setVentasError] = useState('');
+  const [recomendaciones, setRecomendaciones] = useState([]);
 
   // Ventas del día desde la API. El ADMIN ve el total de todos los cajeros
   // (reporte por período); el CAJERO, solo sus ventas.
@@ -26,8 +28,16 @@ export function Dashboard() {
     const hoy = new Date();
     let cancelado = false;
     const cargar = async () => {
+      const fechaDesde = new Date();
+      fechaDesde.setDate(fechaDesde.getDate() - 30);
       try {
         const misVentas = await obtenerMisVentas(hoy, hoy);
+        try {
+          const pico = await fetchHorasPico(fechaDesde.toISOString().split('T')[0], hoy.toISOString().split('T')[0]);
+          setRecomendaciones(pico?.recomendaciones || []);
+        } catch {
+          setRecomendaciones([]);
+        }
         let resumen = {
           cantidad: misVentas.length,
           total: misVentas.reduce((sum, v) => sum + Number(v.total), 0)
@@ -78,6 +88,25 @@ export function Dashboard() {
           </div>
         ))}
       </div>
+
+      {recomendaciones.length > 0 && (
+        <div className="recomendaciones-section">
+          <h4 className="chart-title">Recomendaciones Inteligentes</h4>
+          <div className="recomendaciones-grid">
+            {recomendaciones.map((rec, index) => (
+              <div key={index} className={`recomendacion-card ${rec.tipo}`}>
+                <div className="recomendacion-icon">
+                  {rec.tipo === 'cajero' ? '👥' : '📦'}
+                </div>
+                <div className="recomendacion-content">
+                  <strong>{rec.tipo === 'cajero' ? 'Refuerzo de Cajeros' : 'Alerta de Stock'}</strong>
+                  <p>{rec.mensaje}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="content-grid two-columns">
         <div className="card">

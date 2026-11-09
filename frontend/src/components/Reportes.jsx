@@ -4,17 +4,47 @@ import { useAuth } from '../context/AuthContext';
 import { fetchReportePeriodo, fetchReportePorUsuario, fetchUsuarios } from '../services/reportService';
 import { fetchCurrentUser } from '../services/authService';
 
-function descargarCSV(nombreArchivo, filas, encabezados) {
-  const csv = [
-    encabezados.join(','),
-    ...filas.map(fila => fila.map(celda => `"${String(celda).replace(/"/g, '""')}"`).join(','))
-  ].join('\n');
-  
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+function escapePDF(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function descargarPDF(nombreArchivo, filas, encabezados) {
+  const lineas = [encabezados.join(' | '), ...filas.map(fila => fila.map(celda => escapePDF(String(celda))).join(' | '))];
+
+  let content = 'BT\n/F1 10 Tf\n50 750 Td\n';
+  lineas.forEach((linea, i) => {
+    content += `(${linea}) Tj\n`;
+    if (i < lineas.length - 1) {
+      content += '0 -15 Td\n';
+    }
+  });
+
+  const obj1 = '1 0 obj\n<</Type /Catalog /Pages 2 0 R>>\nendobj\n';
+  const obj2 = '2 0 obj\n<</Type /Pages /Kids [3 0 R] /Count 1>>\nendobj\n';
+  const obj3 = '3 0 obj\n<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources <</Font <</F1 <</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>>>>>\nendobj\n';
+  const obj4 = `4 0 obj\n<</Length ${content.length}>>\nstream\n${content}\nendstream\nendobj\n`;
+
+  const header = '%PDF-1.4\n';
+  const offsets = [];
+  let offset = header.length;
+  [obj1, obj2, obj3, obj4].forEach(obj => {
+    offsets.push(offset);
+    offset += obj.length;
+  });
+  const xrefStart = offset;
+
+  let xref = 'xref\n0 5\n0000000000 65535 f \n';
+  offsets.forEach(off => {
+    xref += String(off).padStart(10, '0') + ' 00000 n \n';
+  });
+  const trailer = `trailer\n<</Size 5 /Root 1 0 R>>\nstartxref\n${xrefStart}\n%%EOF\n`;
+
+  const pdf = header + obj1 + obj2 + obj3 + obj4 + xref + trailer;
+  const blob = new Blob([pdf], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${nombreArchivo}.csv`;
+  link.download = `${nombreArchivo}.pdf`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -120,13 +150,13 @@ export function Reportes() {
                     u.usuario_nombre, u.usuario_username, u.cantidad_ventas,
                     u.total_ventas, u.total_efectivo, u.total_tarjeta, u.total_transferencia ?? 0
                   ]) || [];
-                  descargarCSV(
+                  descargarPDF(
                     `reporte-general-${fechaDesde}_${fechaHasta}`,
                     filas,
                     ['Cajero', 'Usuario', 'Ventas', 'Total', 'Efectivo', 'Tarjeta', 'Transferencia']
                   );
                 }}>
-                  📥 Descargar CSV
+                  📄 Descargar Informe
                 </button>
               )}
               {reporteUsuario && (
@@ -135,13 +165,13 @@ export function Reportes() {
                     new Date(c.fecha_cierre).toLocaleString('es-AR'),
                     c.total_efectivo, c.total_tarjeta, c.total_transferencia ?? 0, c.cantidad_ventas, c.observaciones || ''
                   ]) || [];
-                  descargarCSV(
+                  descargarPDF(
                     `reporte-${reporteUsuario.usuario_username}-${fechaDesde}_${fechaHasta}`,
                     filas,
                     ['Fecha', 'Efectivo', 'Tarjeta', 'Transferencia', 'Ventas', 'Observaciones']
                   );
                 }}>
-                  📥 Descargar CSV
+                  📄 Descargar Informe
                 </button>
               )}
             </div>

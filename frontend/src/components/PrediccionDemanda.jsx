@@ -133,17 +133,17 @@ export function PrediccionDemanda() {
           <div className="header-actions">
             {ventasHora && (
               <button className="secondary-btn" onClick={handleDescargarVentasHora} disabled={loading}>
-                📥 Ventas por Hora (CSV)
+                informe por hora
               </button>
             )}
             {horasPico && (
               <button className="secondary-btn" onClick={handleDescargarHorasPico} disabled={loading}>
-                📥 Horas Pico (CSV)
+                informe hora pico
               </button>
             )}
             {recomendaciones.length > 0 && (
               <button className="secondary-btn" onClick={handleDescargarRecomendaciones} disabled={loading}>
-                📥 Recomendaciones (CSV)
+                recomendaciones
               </button>
             )}
             <button className="primary-btn" onClick={cargarDatos} disabled={loading}>
@@ -189,25 +189,6 @@ export function PrediccionDemanda() {
         {ventasHora && <HourlySalesChart data={ventasHora} />}
 
         {horasPico && <PeakHoursChart data={horasPico} />}
-
-        {recomendaciones.length > 0 && (
-          <div className="recomendaciones-section">
-            <h4 className="chart-title">Recomendaciones Inteligentes</h4>
-            <div className="recomendaciones-grid">
-              {recomendaciones.map((rec, index) => (
-                <div key={index} className={`recomendacion-card ${rec.tipo}`}>
-                  <div className="recomendacion-icon">
-                    {rec.tipo === 'cajero' ? '👥' : '📦'}
-                  </div>
-                  <div className="recomendacion-content">
-                    <strong>{rec.tipo === 'cajero' ? 'Refuerzo de Cajeros' : 'Alerta de Stock'}</strong>
-                    <p>{rec.mensaje}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {!ventasHora && !horasPico && !loading && (
           <div className="empty-state">No hay datos para el período seleccionado</div>
