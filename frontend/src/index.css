@@ -2294,6 +2294,87 @@ kbd {
   flex-wrap: wrap;
 }
 
+/* ===== SCROLL INTERNO (listas largas) ===== */
+.scroll-y {
+    max-height: 1150px;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+}
+
+/* Carrito comparte el mismo alto de scroll que el catálogo */
+.cart-items.scroll-y {
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+/* Punto de venta: catálogo con scroll interno, aprox. 7 productos visibles de alto */
+.checkout-grid {
+  height: 100%;
+}
+
+.checkout-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.checkout-panel .card-header {
+  flex-shrink: 0;
+}
+
+.checkout-panel .catalog-grid.scroll-y {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.scroll-y::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-y::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+.scroll-y::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+.scroll-y::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ===== FOOTER ESTÁTICO ===== */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-main {
+  flex: 1;
+}
+
+.app-footer {
+  background: #0f172a;
+  color: #94a3b8;
+  padding: 1rem 1.5rem;
+  font-size: 0.85rem;
+  text-align: center;
+  border-top: 1px solid #1e293b;
+}
+
+/* Labels de pago y cierre: color oscuro para que se lean sobre fondo blanco */
+.payment-box label {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
 /* ===== ALERTAS POPUP (topbar) ===== */
 .topbar-actions {
   display: flex;

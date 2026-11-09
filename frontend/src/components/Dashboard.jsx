@@ -92,7 +92,7 @@ export function Dashboard() {
       {recomendaciones.length > 0 && (
         <div className="recomendaciones-section">
           <h4 className="chart-title">Recomendaciones Inteligentes</h4>
-          <div className="recomendaciones-grid">
+          <div className="recomendaciones-grid scroll-y">
             {recomendaciones.map((rec, index) => (
               <div key={index} className={`recomendacion-card ${rec.tipo}`}>
                 <div className="recomendacion-icon">
@@ -113,7 +113,7 @@ export function Dashboard() {
           <div className="card-header">
             <h3>Alertas de stock</h3>
           </div>
-          <ul id="lowStockList" className="item-list">
+          <ul id="lowStockList" className="item-list scroll-y">
             {lowStockProducts.length === 0 ? (
               <li><span className="empty-state">Sin alertas</span></li>
             ) : (

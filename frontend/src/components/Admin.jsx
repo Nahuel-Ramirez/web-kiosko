@@ -251,7 +251,7 @@ export function Admin() {
               <button type="button" className="mini-btn" onClick={loadProducts}>Reintentar</button>
             </div>
           )}
-          <div className="table-wrapper">
+          <div className="table-wrapper scroll-y">
             <table className="inventory-table">
               <thead>
                 <tr>

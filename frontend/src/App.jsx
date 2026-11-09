@@ -53,54 +53,59 @@ function AppContent() {
 
   return (
     <div id="appView" className="screen active">
-      <div className="app-shell">
-        <Sidebar activePanel={activePanel} setActivePanel={setActivePanel} />
-        <main className="main-panel">
-          <header className="topbar">
-            <div>
-              <p className="eyebrow">Resumen</p>
-              <h2 id="pageTitle">
-                {activePanel === 'dashboard' && 'Dashboard'}
-                {activePanel === 'admin' && 'Productos'}
-                {activePanel === 'cajeros' && 'Cajeros'}
-                {activePanel === 'caja' && 'Caja'}
-                {activePanel === 'reportes' && 'Reportes'}
-                {activePanel === 'prediccion' && 'Predicción de Demanda'}
-              </h2>
-            </div>
-            <div className="topbar-actions">
-              <button
-                className="alertas-trigger"
-                aria-label="Alertas de stock"
-                onClick={() => setAlertasOpen(!alertasOpen)}
-              >
-                🔔{lowStockProducts.length > 0 ? ` (${lowStockProducts.length})` : ''}
-              </button>
-              {alertasOpen && lowStockProducts.length > 0 && (
-                <div className="alertas-popup">
-                  <div className="alertas-popup-header">
-                    <strong>Alertas de stock</strong>
-                    <button className="alertas-close" onClick={() => setAlertasOpen(false)}>×</button>
+      <div className="app-layout">
+        <div className="app-shell">
+          <Sidebar activePanel={activePanel} setActivePanel={setActivePanel} />
+          <main className="app-main main-panel">
+            <header className="topbar">
+              <div>
+                <p className="eyebrow">Resumen</p>
+                <h2 id="pageTitle">
+                  {activePanel === 'dashboard' && 'Dashboard'}
+                  {activePanel === 'admin' && 'Productos'}
+                  {activePanel === 'cajeros' && 'Cajeros'}
+                  {activePanel === 'caja' && 'Caja'}
+                  {activePanel === 'reportes' && 'Reportes'}
+                  {activePanel === 'prediccion' && 'Predicción de Demanda'}
+                </h2>
+              </div>
+              <div className="topbar-actions">
+                <button
+                  className="alertas-trigger"
+                  aria-label="Alertas de stock"
+                  onClick={() => setAlertasOpen(!alertasOpen)}
+                >
+                  🔔{lowStockProducts.length > 0 ? ` (${lowStockProducts.length})` : ''}
+                </button>
+                {alertasOpen && lowStockProducts.length > 0 && (
+                  <div className="alertas-popup">
+                    <div className="alertas-popup-header">
+                      <strong>Alertas de stock</strong>
+                      <button className="alertas-close" onClick={() => setAlertasOpen(false)}>×</button>
+                    </div>
+                    <ul className="alertas-list">
+                      {lowStockProducts.map(item => (
+                        <li key={item.id} className="alertas-item">
+                          <div>
+                            <strong>{item.name}</strong>
+                            <small>Stock: {item.stock}</small>
+                          </div>
+                          <span className={`stock-tag ${getStockTagClass(item.stock)}`}>
+                            {getStockStatus(item.stock).label}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="alertas-list">
-                    {lowStockProducts.map(item => (
-                      <li key={item.id} className="alertas-item">
-                        <div>
-                          <strong>{item.name}</strong>
-                          <small>Stock: {item.stock}</small>
-                        </div>
-                        <span className={`stock-tag ${getStockTagClass(item.stock)}`}>
-                          {getStockStatus(item.stock).label}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </header>
-          {renderPanel()}
-        </main>
+                )}
+              </div>
+            </header>
+            {renderPanel()}
+          </main>
+        </div>
+        <footer className="app-footer">
+          Web Kiosko — Sistema de Cobros &nbsp;|&nbsp; TP Metodologías Ágiles (UNAB)
+        </footer>
       </div>
     </div>
   );
