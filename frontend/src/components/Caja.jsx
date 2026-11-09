@@ -345,57 +345,57 @@ export function Caja() {
                 <h3>Cierre de caja (Turno actual)</h3>
               </div>
               <div className="cierre-resumen">
-                  <div className="cierre-row">
-                    <span>Ventas en este turno</span>
-                    <strong>{cantidad}</strong>
-                  </div>
-                  <div className="cierre-row">
-                    <span>Efectivo</span>
-                    <strong>{formatMoney(totalEfectivo)}</strong>
-                  </div>
-                  <div className="cierre-row">
-                    <span>Tarjeta</span>
-                    <strong>{formatMoney(totalTarjeta)}</strong>
-                  </div>
-                  <div className="cierre-row">
-                    <span>Transferencia</span>
-                    <strong>{formatMoney(totalTransferencia)}</strong>
-                  </div>
-                  <div className="cierre-row total">
-                    <span>Total</span>
-                    <strong>{formatMoney(totalGeneral)}</strong>
-                  </div>
+                <div className="cierre-row">
+                  <span>Ventas en este turno</span>
+                  <strong>{cantidad}</strong>
                 </div>
-                <div className="payment-box">
-                  <label>
-                    Monto inicial en caja
-                    <input
-                      id="montoInicial"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0"
-                      value={montoInicial}
-                      onChange={(e) => { setMontoInicial(e.target.value); setCierreError(''); }}
-                    />
-                  </label>
-                  <label>
-                    Efectivo contado <span className="required">*</span>
-                    <input
-                      id="efectivoContado"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0"
-                      value={efectivoContado}
-                      onChange={(e) => { setEfectivoContado(e.target.value); setCierreError(''); }}
-                    />
-                  </label>
-                  <div className="change-box">
-                    <span>Efectivo esperado</span>
-                    <strong>{formatMoney(efectivoEsperado)}</strong>
-                  </div>
+                <div className="cierre-row">
+                  <span>Efectivo</span>
+                  <strong>{formatMoney(totalEfectivo)}</strong>
                 </div>
+                <div className="cierre-row">
+                  <span>Tarjeta</span>
+                  <strong>{formatMoney(totalTarjeta)}</strong>
+                </div>
+                <div className="cierre-row">
+                  <span>Transferencia</span>
+                  <strong>{formatMoney(totalTransferencia)}</strong>
+                </div>
+                <div className="cierre-row total">
+                  <span>Total</span>
+                  <strong>{formatMoney(totalGeneral)}</strong>
+                </div>
+              </div>
+              <div className="payment-box">
+                <label>
+                  Monto inicial en caja
+                  <input
+                    id="montoInicial"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0"
+                    value={montoInicial}
+                    onChange={(e) => { setMontoInicial(e.target.value); setCierreError(''); }}
+                  />
+                </label>
+                <label>
+                  Efectivo contado <span className="required">*</span>
+                  <input
+                    id="efectivoContado"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0"
+                    value={efectivoContado}
+                    onChange={(e) => { setEfectivoContado(e.target.value); setCierreError(''); }}
+                  />
+                </label>
+                <div className="change-box">
+                  <span>Efectivo esperado</span>
+                  <strong>{formatMoney(efectivoEsperado)}</strong>
+                </div>
+              </div>
               {cierreError && <div className="form-message error">{cierreError}</div>}
               {cierreExito && (
                 <div className="form-message success">
