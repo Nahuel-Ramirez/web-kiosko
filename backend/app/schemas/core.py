@@ -76,7 +76,8 @@ class ClienteOut(ClienteBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-
+    razon_social: str
+    dni_cuit: Optional[str] = None
 
 # ===== PRODUCTOS =====
 class ProductoBase(BaseModel):
@@ -155,6 +156,7 @@ class VentaOut(VentaBase):
     cierre_id: Optional[int] = None
     fecha: datetime
     detalles: List[DetalleVentaOut] = []
+    cliente: Optional[ClienteOut] = None
 
 
 # ===== CIERRES DE CAJA =====
