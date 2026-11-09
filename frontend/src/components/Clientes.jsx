@@ -192,19 +192,6 @@ export function Clientes() {
         <div className="card">
           <div className="card-header">
             <h3>Listado de clientes</h3>
-            {!editingId && (
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={() => {
-                  setShowForm(true);
-                  setEditingId(null);
-                  setFormData({ dni_cuit: '', razon_social: '', domicilio: '', telefono: '' });
-                }}
-              >
-                + Nuevo cliente
-              </button>
-            )}
           </div>
           {clientes.length === 0 && (
             <div className="empty-state">No hay clientes cargados.</div>
