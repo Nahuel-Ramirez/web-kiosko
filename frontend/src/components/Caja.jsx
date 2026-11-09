@@ -162,7 +162,7 @@ export function Caja() {
         total: Number(venta.total),
         fecha: venta.fecha,
         cajero: currentUser?.nombre || 'Cajero',
-        cliente: clienteSeleccionado?.nombre || 'Consumidor Final',
+        cliente: clienteSeleccionado || { id: 1, nombre: 'Consumidor Final', dni: '0', cuit: '0' },
         metodo_pago: venta.metodo_pago,
         monto_recibido: Number(venta.monto_recibido),
         vuelto: Number(venta.vuelto),

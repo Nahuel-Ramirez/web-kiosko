@@ -32,10 +32,10 @@ export function TicketVenta({ venta, width = '80mm', onPrint, onClose }) {
             <span>Ticket N°: <strong>{venta.id}</strong></span>
             <span>Fecha: <strong>{formatFecha(venta.fecha)}</strong></span>
             <span>Cajero: <strong>{venta.cajero || 'Admin'}</strong></span>
-            {venta.cliente && (typeof venta.cliente === 'object' ? venta.cliente.razon_social : venta.cliente) !== "Consumidor Final" ? (
+            {venta.cliente && typeof venta.cliente === 'object' && venta.cliente.nombre !== "Consumidor Final" ? (
               <>
-                <span>Cliente: <strong>{venta.cliente.razon_social || venta.cliente}</strong></span>
-                <span>DNI/CUIT: <strong>{venta.cliente.dni_cuit ||'-'}</strong></span>
+                <span>Cliente: <strong>{venta.cliente.nombre}</strong></span>
+                <span>DNI/CUIT: <strong>{venta.cliente.dni || venta.cliente.cuit || '-'}</strong></span>
               </>
             ) : (
               <span>Cliente: <strong>Consumidor Final</strong></span>
