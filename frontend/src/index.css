@@ -2337,6 +2337,11 @@ kbd {
   max-height: 495px;
 }
 
+/* Listado de clientes - scroll propio con altura limitada */
+#clientesPanel .table-wrapper.scroll-y {
+  max-height: 495px;
+}
+
 .scroll-y::-webkit-scrollbar {
   width: 8px;
 }
