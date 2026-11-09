@@ -19,7 +19,8 @@ export function ClienteSelectorModal({ isOpen, onClose, onSelect, initialClient 
         <div className="modal-body">
           <p className="modal-hint">
             Seleccione un cliente para asociar a esta venta. 
-            <strong>Consumidor Final</strong> se asigna por defecto.
+            <strong>Consumidor Final</strong> se asigna por defecto. 
+            También puede buscar por CUIL/DNI o crear uno nuevo si no existe.
           </p>
           
           <div className="client-options">

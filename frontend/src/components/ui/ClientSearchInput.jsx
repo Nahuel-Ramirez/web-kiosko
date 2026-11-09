@@ -1,21 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { crearCliente } from '../../services/clienteService';
 
-export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por DNI/CUIT...', initialClient = null }) {
+export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por CUIL/DNI...', initialClient = null }) {
   const [query, setQuery] = useState(initialClient ? '' : '');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedClient, setSelectedClient] = useState(initialClient);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState(false);
+  const [createData, setCreateData] = useState({ nombre: '', dni_cuit: '', domicilio: '', telefono: '' });
+  const [createError, setCreateError] = useState(null);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-  function getAuthHeaders() {
-    const token = localStorage.getItem('web_kiosko_token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
 
   const debouncedSearch = useRef(null);
 
@@ -23,6 +21,7 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
     if (!dni || dni.length < 3) {
       setResults([]);
       setShowDropdown(false);
+      setCreateForm(false);
       return;
     }
 
@@ -45,10 +44,12 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
         const data = await response.json();
         setResults(data);
         setShowDropdown(data.length > 0);
+        setCreateForm(data.length === 0);
       } catch (err) {
         setError(err.message);
         setResults([]);
         setShowDropdown(false);
+        setCreateForm(false);
       } finally {
         setLoading(false);
       }
@@ -66,6 +67,7 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
     setSelectedClient(client);
     setQuery(client.dni || client.cuit || '');
     setShowDropdown(false);
+    setCreateForm(false);
     onSelect?.(client);
   };
 
@@ -74,28 +76,65 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
     setQuery('');
     setResults([]);
     setShowDropdown(false);
+    setCreateForm(false);
     onSelect?.(null);
+  };
+
+  const handleCreateToggle = () => {
+    setCreateForm(!createForm);
+    setCreateError(null);
+    setCreateData({ nombre: '', dni_cuit: '', domicilio: '', telefono: '' });
+  };
+
+  const handleCreateChange = (e) => {
+    const { name, value } = e.target;
+    setCreateData(prev => ({ ...prev, [name]: value }));
+    setCreateError(null);
+  };
+
+  const handleCreateSubmit = async (e) => {
+    e.preventDefault();
+    setCreateError(null);
+    setCreating(true);
+    try {
+      const nuevo = await crearCliente({
+        razon_social: createData.nombre.trim(),
+        dni_cuit: createData.dni_cuit.trim(),
+        domicilio: createData.domicilio.trim() || null,
+        telefono: createData.telefono.trim() || null,
+      });
+      const client = {
+        id: nuevo.id,
+        nombre: nuevo.razon_social,
+        dni: nuevo.dni_cuit.length === 11 ? undefined : nuevo.dni_cuit,
+        cuit: nuevo.dni_cuit.length === 11 ? nuevo.dni_cuit : undefined,
+      };
+      setSelectedClient(client);
+      setQuery(nuevo.dni_cuit);
+      setShowDropdown(false);
+      setCreateForm(false);
+      onSelect?.(client);
+    } catch (err) {
+      setCreateError(err.message || 'Error al crear cliente');
+    } finally {
+      setCreating(false);
+    }
   };
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
-    // Solo cierra si el click no fue ni en el input ni en el dropdown; si no, el
-    // dropdown se desmonta en el mousedown y el click en un cliente nunca llega.
     const handleClickOutside = (e) => {
       const enDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
       const enInput = inputRef.current && inputRef.current.contains(e.target);
       if (!enDropdown && !enInput) {
         setShowDropdown(false);
+        setCreateForm(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const displayValue = selectedClient
-    ? `${selectedClient.nombre} (${selectedClient.dni || selectedClient.cuit})`
-    : '';
 
   return (
     <div className="client-search-wrapper" ref={dropdownRef}>
@@ -171,11 +210,114 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
           ))}
           {results.length === 0 && query.length >= 3 && !loading && (
             <div className="client-dropdown-empty">
-              No se encontraron clientes. <button type="button" className="link-btn" onClick={() => window.location.href = '/admin#clientes'}>
-                Registrar nuevo
+              No se encontraron clientes.
+              <button type="button" className="link-btn" onClick={handleCreateToggle}>
+                Crear cliente
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {createForm && (
+        <div className="client-create-form">
+          <h4 className="client-create-title">Nuevo cliente</h4>
+          {createError && <div className="client-error">{createError}</div>}
+          <form onSubmit={handleCreateSubmit} style={{ display: 'grid', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="create-field">
+                <label className="create-label">Nombre / Razón Social <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  name="nombre"
+                  value={createData.nombre}
+                  onChange={handleCreateChange}
+                  placeholder="Ej: Juan Pérez"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.6rem 0.8rem',
+                    border: '1px solid var(--line)',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem',
+                  }}
+                />
+              </div>
+              <div className="create-field">
+                <label className="create-label">CUIL / DNI <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  name="dni_cuit"
+                  value={createData.dni_cuit}
+                  onChange={handleCreateChange}
+                  placeholder="Ej: 20123456789"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.6rem 0.8rem',
+                    border: '1px solid var(--line)',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem',
+                  }}
+                />
+              </div>
+            </div>
+            <div className="create-field">
+              <label className="create-label">Domicilio</label>
+              <input
+                name="domicilio"
+                value={createData.domicilio}
+                onChange={handleCreateChange}
+                placeholder="Ej: Calle Falsa 123"
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 0.8rem',
+                  border: '1px solid var(--line)',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem',
+                }}
+              />
+            </div>
+            <div className="create-field">
+              <label className="create-label">Teléfono</label>
+              <input
+                name="telefono"
+                value={createData.telefono}
+                onChange={handleCreateChange}
+                placeholder="Ej: 11-5555-0101"
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 0.8rem',
+                  border: '1px solid var(--line)',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button
+                type="submit"
+                disabled={creating}
+                className="primary-btn"
+                style={{
+                  flex: 1,
+                  padding: '0.6rem 1rem',
+                  fontSize: '0.9rem',
+                }}
+              >
+                {creating ? 'Creando...' : 'Crear cliente'}
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateToggle}
+                className="secondary-btn"
+                style={{
+                  padding: '0.6rem 1rem',
+                  fontSize: '0.9rem',
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
