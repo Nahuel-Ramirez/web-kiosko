@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.cierre_caja import CierreCaja
 from app.models.cliente import Cliente
+from app.models.movimiento_fiado import MovimientoFiado
 from app.models.producto import Producto
 from app.models.usuario import Usuario
 from app.models.venta import DetalleVenta, Venta
@@ -248,6 +249,10 @@ def borrar(db: Session) -> Dict[str, int]:
         ))]
         cierres = [c.id for c in db.query(CierreCaja.id).filter(CierreCaja.observaciones.like("%" + MARCA_CIERRE))]
 
+        db.query(MovimientoFiado).filter(or_(
+            MovimientoFiado.cliente_id.in_(clientes or [-1]),
+            MovimientoFiado.venta_id.in_(ventas or [-1]),
+        )).delete(synchronize_session=False)
         db.query(DetalleVenta).filter(DetalleVenta.venta_id.in_(ventas or [-1])).delete(synchronize_session=False)
         db.query(Venta).filter(Venta.id.in_(ventas or [-1])).delete(synchronize_session=False)
         # si quedara alguna venta real dentro de un cierre de ejemplo, se desvincula antes de borrarlo

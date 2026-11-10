@@ -1,12 +1,13 @@
 ﻿from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, case
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.security import hash_password
 from app.models.cliente import Cliente
 from app.models.cierre_caja import CierreCaja
+from app.models.movimiento_fiado import MovimientoFiado
 from app.models.producto import Producto
 from app.models.usuario import Usuario
 from app.models.venta import Venta, DetalleVenta
@@ -16,6 +17,8 @@ from app.schemas.core import (
     ClienteCreate,
     ClienteUpdate,
     DetalleVentaCreate,
+    MovimientoFiadoOut,
+    PagoFiadoCreate,
     ProductoCreate,
     ProductoUpdate,
     ReporteVentasPeriodo,
@@ -81,6 +84,7 @@ def delete_usuario(db: Session, usuario_id: int) -> bool:
     if (
         db.query(Venta).filter(Venta.usuario_id == usuario_id).first()
         or db.query(CierreCaja).filter(CierreCaja.usuario_id == usuario_id).first()
+        or db.query(MovimientoFiado).filter(MovimientoFiado.usuario_id == usuario_id).first()
     ):
         raise ReglaNegocioError("El usuario tiene ventas registradas; desactivalo en lugar de eliminarlo", status_code=409)
     db.delete(usuario)
@@ -127,8 +131,12 @@ def update_cliente(db: Session, cliente_id: int, datos: ClienteUpdate) -> Option
     cliente = get_cliente(db, cliente_id)
     if not cliente:
         return None
-    for field, value in datos.model_dump(exclude_unset=True).items():
+    cambios = datos.model_dump(exclude_unset=True)
+    for field, value in cambios.items():
         setattr(cliente, field, value)
+    # Para una persona, razon_social sigue siendo "Apellido Nombre" aunque cambie alguno de los dos.
+    if ("nombre" in cambios or "apellido" in cambios) and cliente.nombre and cliente.apellido:
+        cliente.razon_social = "%s %s" % (cliente.apellido.strip(), cliente.nombre.strip())
     db.commit()
     db.refresh(cliente)
     return cliente
@@ -203,9 +211,15 @@ def create_venta(db: Session, usuario_id: int, datos: VentaCreate) -> Venta:
 
     Valida: cliente existente, productos existentes, stock suficiente (sumando
     lineas repetidas del mismo producto) y que el total coincida con el detalle.
-    Si algo falla no se guarda nada (rollback).
+    Si es FIADO valida ademas el cliente y su limite, y guarda el movimiento de
+    deuda en la misma transaccion. Si algo falla no se guarda nada (rollback).
     """
-    if not get_cliente(db, datos.cliente_id):
+    es_fiado = datos.metodo_pago == "FIADO"
+    if es_fiado:
+        cliente = _get_cliente_bloqueado(db, datos.cliente_id)
+    else:
+        cliente = get_cliente(db, datos.cliente_id)
+    if not cliente:
         raise ReglaNegocioError("El cliente indicado no existe")
 
     # Cantidad total pedida por producto (una misma venta puede repetir lineas)
@@ -232,17 +246,32 @@ def create_venta(db: Session, usuario_id: int, datos: VentaCreate) -> Venta:
             "El total (%s) no coincide con la suma del detalle (%s)" % (datos.total, suma_detalle)
         )
 
+    if es_fiado:
+        _validar_fiado(db, cliente, datos.total)
+
     try:
         venta = Venta(
             usuario_id=usuario_id,
             cliente_id=datos.cliente_id,
             total=datos.total,
             metodo_pago=datos.metodo_pago,
-            monto_recibido=datos.monto_recibido,
-            vuelto=datos.vuelto,
+            # En una venta fiada no se cobra nada en el momento.
+            monto_recibido=None if es_fiado else datos.monto_recibido,
+            vuelto=None if es_fiado else datos.vuelto,
         )
         db.add(venta)
         db.flush()
+
+        if es_fiado:
+            db.add(
+                MovimientoFiado(
+                    cliente_id=cliente.id,
+                    usuario_id=usuario_id,
+                    venta_id=venta.id,
+                    tipo="VENTA",
+                    monto=datos.total,
+                )
+            )
 
         for det in datos.detalles:
             db.add(
@@ -476,7 +505,7 @@ def get_reporte_ventas_periodo(
             por_usuario_dict[uid]["total_efectivo"] += v.total
         elif v.metodo_pago == "TRANSFERENCIA":
             por_usuario_dict[uid]["total_transferencia"] += v.total
-        else:
+        elif v.metodo_pago == "TARJETA":
             por_usuario_dict[uid]["total_tarjeta"] += v.total
 
     # Cierres en el per�odo
@@ -509,6 +538,126 @@ def get_reporte_ventas_periodo(
         cantidad_ventas=len(ventas),
         por_usuario=por_usuario,
     )
+
+
+# ===== FIADO =====
+CONSUMIDOR_FINAL_ID = 1
+
+
+def _dinero(valor) -> Decimal:
+    return Decimal(str(valor if valor is not None else 0)).quantize(Decimal("0.01"))
+
+
+def _get_cliente_bloqueado(db: Session, cliente_id: int) -> Optional[Cliente]:
+    """Lee el cliente bloqueando su fila hasta el commit: dos operaciones de fiado
+    simultaneas del mismo cliente no pueden pasarse del limite entre las dos."""
+    return db.query(Cliente).filter(Cliente.id == cliente_id).with_for_update().first()
+
+
+def _monto_con_signo():
+    return case((MovimientoFiado.tipo == "VENTA", MovimientoFiado.monto), else_=-MovimientoFiado.monto)
+
+
+def get_saldo_fiado(db: Session, cliente_id: int) -> Decimal:
+    """Lo que debe el cliente: ventas fiadas menos pagos (la misma cuenta que vista_saldos_fiado)."""
+    saldo = db.query(func.sum(_monto_con_signo())).filter(MovimientoFiado.cliente_id == cliente_id).scalar()
+    return _dinero(saldo)
+
+
+def _validar_fiado(db: Session, cliente: Cliente, total: Decimal) -> None:
+    if cliente.id == CONSUMIDOR_FINAL_ID:
+        raise ReglaNegocioError("No se puede fiar a Consumidor Final: elegi un cliente")
+    if not cliente.activo:
+        raise ReglaNegocioError("El cliente esta dado de baja y no puede llevar fiado")
+    if total <= 0:
+        raise ReglaNegocioError("Una venta fiada tiene que tener un total mayor a 0")
+    saldo = get_saldo_fiado(db, cliente.id)
+    limite = _dinero(cliente.limite_fiado)
+    if saldo + total > limite:
+        raise ReglaNegocioError(
+            "La venta supera el limite de fiado de %s (debe %s, limite %s, disponible %s)"
+            % (cliente.razon_social, saldo, limite, limite - saldo),
+            status_code=409,
+        )
+
+
+def registrar_pago_fiado(db: Session, cliente_id: int, usuario_id: int, datos: PagoFiadoCreate) -> Optional[dict]:
+    """Registra un pago de deuda. Por ahora queda solo en movimientos_fiado: no entra
+    en la caja del turno ni en el arqueo."""
+    cliente = _get_cliente_bloqueado(db, cliente_id)
+    if not cliente:
+        return None
+    saldo = get_saldo_fiado(db, cliente_id)
+    if datos.monto > saldo:
+        raise ReglaNegocioError("El pago (%s) supera lo que debe el cliente (%s)" % (datos.monto, saldo))
+
+    movimiento = MovimientoFiado(
+        cliente_id=cliente_id,
+        usuario_id=usuario_id,
+        tipo="PAGO",
+        monto=datos.monto,
+        observaciones=datos.observaciones,
+    )
+    try:
+        db.add(movimiento)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(movimiento)
+    return dict(MovimientoFiadoOut.model_validate(movimiento).model_dump(), saldo=saldo - datos.monto)
+
+
+def get_cuenta_fiado(db: Session, cliente_id: int) -> Optional[dict]:
+    """Saldo del cliente y sus movimientos de fiado, del mas nuevo al mas viejo."""
+    cliente = get_cliente(db, cliente_id)
+    if not cliente:
+        return None
+    movimientos = (
+        db.query(MovimientoFiado)
+        .filter(MovimientoFiado.cliente_id == cliente_id)
+        .order_by(MovimientoFiado.fecha.desc(), MovimientoFiado.id.desc())
+        .all()
+    )
+    saldo = _dinero(sum((m.monto if m.tipo == "VENTA" else -m.monto for m in movimientos), Decimal("0")))
+    limite = _dinero(cliente.limite_fiado)
+    return {
+        "cliente_id": cliente.id,
+        "razon_social": cliente.razon_social,
+        "limite_fiado": limite,
+        "saldo": saldo,
+        "disponible": limite - saldo,
+        "movimientos": movimientos,
+    }
+
+
+def get_deudores(db: Session) -> List[dict]:
+    """Clientes que deben algo, de mayor a menor deuda."""
+    saldo = func.sum(_monto_con_signo())
+    filas = (
+        db.query(Cliente, saldo.label("saldo"), func.max(MovimientoFiado.fecha).label("ultimo_movimiento"))
+        .join(MovimientoFiado, MovimientoFiado.cliente_id == Cliente.id)
+        .group_by(Cliente.id)
+        .having(saldo > 0)
+        .order_by(saldo.desc(), Cliente.razon_social.asc())
+        .all()
+    )
+    deudores = []
+    for cliente, saldo_cliente, ultimo in filas:
+        limite = _dinero(cliente.limite_fiado)
+        saldo_cliente = _dinero(saldo_cliente)
+        deudores.append({
+            "cliente_id": cliente.id,
+            "razon_social": cliente.razon_social,
+            "dni_cuit": cliente.dni_cuit,
+            "telefono": cliente.telefono,
+            "activo": cliente.activo,
+            "limite_fiado": limite,
+            "saldo": saldo_cliente,
+            "disponible": limite - saldo_cliente,
+            "ultimo_movimiento": ultimo,
+        })
+    return deudores
 
 
 

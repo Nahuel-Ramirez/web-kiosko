@@ -1,6 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { crearCliente } from '../../services/clienteService';
 
+const ALTA_VACIA = { tipo: 'persona', nombre: '', apellido: '', razon_social: '', dni_cuit: '', email: '', domicilio: '', telefono: '' };
+
+const campoStyle = {
+  width: '100%',
+  padding: '0.6rem 0.8rem',
+  border: '1px solid var(--line)',
+  borderRadius: '8px',
+  fontSize: '0.9rem',
+};
+
+// La regla global de label en index.css es para el login (texto blanco); acá el fondo es claro.
+const labelStyle = { color: 'var(--text)', fontWeight: 600, fontSize: '0.85rem' };
+
 export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por CUIL/DNI...', initialClient = null }) {
   const [query, setQuery] = useState(initialClient ? '' : '');
   const [results, setResults] = useState([]);
@@ -10,7 +23,7 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
   const [showDropdown, setShowDropdown] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState(false);
-  const [createData, setCreateData] = useState({ nombre: '', dni_cuit: '', domicilio: '', telefono: '' });
+  const [createData, setCreateData] = useState(ALTA_VACIA);
   const [createError, setCreateError] = useState(null);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -83,7 +96,7 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
   const handleCreateToggle = () => {
     setCreateForm(!createForm);
     setCreateError(null);
-    setCreateData({ nombre: '', dni_cuit: '', domicilio: '', telefono: '' });
+    setCreateData(ALTA_VACIA);
   };
 
   const handleCreateChange = (e) => {
@@ -97,9 +110,14 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
     setCreateError(null);
     setCreating(true);
     try {
+      // Persona: el backend arma la razon social como "Apellido Nombre".
+      const esPersona = createData.tipo === 'persona';
       const nuevo = await crearCliente({
-        razon_social: createData.nombre.trim(),
+        nombre: esPersona ? createData.nombre.trim() : null,
+        apellido: esPersona ? createData.apellido.trim() : null,
+        razon_social: esPersona ? null : createData.razon_social.trim(),
         dni_cuit: createData.dni_cuit.trim(),
+        email: createData.email.trim() || null,
         domicilio: createData.domicilio.trim() || null,
         telefono: createData.telefono.trim() || null,
       });
@@ -226,71 +244,94 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
           <form onSubmit={handleCreateSubmit} style={{ display: 'grid', gap: '0.75rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div className="create-field">
-                <label className="create-label">Nombre / Razón Social <span style={{ color: 'var(--danger)' }}>*</span></label>
-                <input
-                  name="nombre"
-                  value={createData.nombre}
-                  onChange={handleCreateChange}
-                  placeholder="Ej: Juan Pérez"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.8rem',
-                    border: '1px solid var(--line)',
-                    borderRadius: '8px',
-                    fontSize: '0.9rem',
-                  }}
-                />
+                <label className="create-label" style={labelStyle}>Tipo</label>
+                <select name="tipo" value={createData.tipo} onChange={handleCreateChange} style={campoStyle}>
+                  <option value="persona">Persona</option>
+                  <option value="comercio">Comercio / empresa</option>
+                </select>
               </div>
               <div className="create-field">
-                <label className="create-label">CUIL / DNI <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <label className="create-label" style={labelStyle}>CUIL / DNI <span style={{ color: 'var(--danger)' }}>*</span></label>
                 <input
                   name="dni_cuit"
                   value={createData.dni_cuit}
                   onChange={handleCreateChange}
                   placeholder="Ej: 20123456789"
                   required
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.8rem',
-                    border: '1px solid var(--line)',
-                    borderRadius: '8px',
-                    fontSize: '0.9rem',
-                  }}
+                  style={campoStyle}
                 />
               </div>
             </div>
+            {createData.tipo === 'persona' ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="create-field">
+                  <label className="create-label" style={labelStyle}>Nombre <span style={{ color: 'var(--danger)' }}>*</span></label>
+                  <input
+                    name="nombre"
+                    value={createData.nombre}
+                    onChange={handleCreateChange}
+                    placeholder="Ej: Juan"
+                    required
+                    style={campoStyle}
+                  />
+                </div>
+                <div className="create-field">
+                  <label className="create-label" style={labelStyle}>Apellido <span style={{ color: 'var(--danger)' }}>*</span></label>
+                  <input
+                    name="apellido"
+                    value={createData.apellido}
+                    onChange={handleCreateChange}
+                    placeholder="Ej: Pérez"
+                    required
+                    style={campoStyle}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="create-field">
+                <label className="create-label" style={labelStyle}>Razón social <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  name="razon_social"
+                  value={createData.razon_social}
+                  onChange={handleCreateChange}
+                  placeholder="Ej: Kiosco La Esquina SRL"
+                  required
+                  style={campoStyle}
+                />
+              </div>
+            )}
             <div className="create-field">
-              <label className="create-label">Domicilio</label>
+              <label className="create-label" style={labelStyle}>Domicilio</label>
               <input
                 name="domicilio"
                 value={createData.domicilio}
                 onChange={handleCreateChange}
                 placeholder="Ej: Calle Falsa 123"
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 0.8rem',
-                  border: '1px solid var(--line)',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                }}
+                style={campoStyle}
               />
             </div>
-            <div className="create-field">
-              <label className="create-label">Teléfono</label>
-              <input
-                name="telefono"
-                value={createData.telefono}
-                onChange={handleCreateChange}
-                placeholder="Ej: 11-5555-0101"
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 0.8rem',
-                  border: '1px solid var(--line)',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                }}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="create-field">
+                <label className="create-label" style={labelStyle}>Teléfono</label>
+                <input
+                  name="telefono"
+                  value={createData.telefono}
+                  onChange={handleCreateChange}
+                  placeholder="Ej: 11-5555-0101"
+                  style={campoStyle}
+                />
+              </div>
+              <div className="create-field">
+                <label className="create-label" style={labelStyle}>Email</label>
+                <input
+                  name="email"
+                  type="email"
+                  value={createData.email}
+                  onChange={handleCreateChange}
+                  placeholder="Ej: juan@mail.com"
+                  style={campoStyle}
+                />
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
               <button
