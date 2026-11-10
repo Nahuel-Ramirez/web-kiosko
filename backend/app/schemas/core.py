@@ -1,9 +1,9 @@
 ﻿from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-METODOS_PAGO_VALIDOS = {'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'}
+METODOS_PAGO_VALIDOS = {'EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'FIADO'}
 ROLES_VALIDOS = {'ADMIN', 'CAJERO'}
 
 
@@ -59,10 +59,24 @@ class ClienteBase(BaseModel):
     razon_social: str
     domicilio: Optional[str] = None
     telefono: Optional[str] = None
+    nombre: Optional[str] = None
+    apellido: Optional[str] = None
+    email: Optional[str] = None
+    limite_fiado: Decimal = Field(default=Decimal('10000'), ge=0)
+    activo: bool = True
 
 
 class ClienteCreate(ClienteBase):
-    pass
+    # Para una persona alcanza con nombre y apellido: el backend arma razon_social.
+    razon_social: Optional[str] = None
+
+    @model_validator(mode='after')
+    def armar_razon_social(self):
+        if self.nombre and self.apellido:
+            self.razon_social = '%s %s' % (self.apellido.strip(), self.nombre.strip())
+        if not self.razon_social or not self.razon_social.strip():
+            raise ValueError('Indicar razon_social, o nombre y apellido')
+        return self
 
 
 class ClienteUpdate(BaseModel):
@@ -70,6 +84,11 @@ class ClienteUpdate(BaseModel):
     razon_social: Optional[str] = None
     domicilio: Optional[str] = None
     telefono: Optional[str] = None
+    nombre: Optional[str] = None
+    apellido: Optional[str] = None
+    email: Optional[str] = None
+    limite_fiado: Optional[Decimal] = Field(default=None, ge=0)
+    activo: Optional[bool] = None
 
 
 class ClienteOut(ClienteBase):
@@ -78,6 +97,7 @@ class ClienteOut(ClienteBase):
     id: int
     razon_social: str
     dni_cuit: Optional[str] = None
+    fecha_alta: Optional[datetime] = None
 
 # ===== PRODUCTOS =====
 class ProductoBase(BaseModel):
@@ -283,5 +303,49 @@ class ProductoMasVendido(BaseModel):
     codigo_barras: str
     cantidad_vendida: int
     total_vendido: Decimal
+
+
+# ===== FIADO =====
+class MovimientoFiadoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    cliente_id: int
+    usuario_id: int
+    venta_id: Optional[int] = None
+    tipo: str  # 'VENTA' suma deuda | 'PAGO' la baja
+    monto: Decimal
+    fecha: datetime
+    observaciones: Optional[str] = None
+
+
+class PagoFiadoCreate(BaseModel):
+    monto: Decimal = Field(gt=0)
+    observaciones: Optional[str] = None
+
+
+class PagoFiadoOut(MovimientoFiadoOut):
+    saldo: Decimal
+
+
+class CuentaFiadoOut(BaseModel):
+    cliente_id: int
+    razon_social: str
+    limite_fiado: Decimal
+    saldo: Decimal
+    disponible: Decimal
+    movimientos: List[MovimientoFiadoOut] = []
+
+
+class DeudorOut(BaseModel):
+    cliente_id: int
+    razon_social: str
+    dni_cuit: str
+    telefono: Optional[str] = None
+    activo: bool
+    limite_fiado: Decimal
+    saldo: Decimal
+    disponible: Decimal
+    ultimo_movimiento: Optional[datetime] = None
 
 

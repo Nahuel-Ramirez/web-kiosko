@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from app.routers import auth, clientes, productos, reportes, turnos, usuarios
+from app.routers import auth, clientes, fiados, productos, reportes, turnos, usuarios
 from app.services.core_service import ReglaNegocioError
 
 app = FastAPI(title="Web Kiosko API")
@@ -30,6 +30,7 @@ app.include_router(usuarios.router)
 app.include_router(turnos.router)
 app.include_router(productos.router)
 app.include_router(clientes.router)
+app.include_router(fiados.router)
 app.include_router(reportes.router)
 
 

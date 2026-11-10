@@ -7,7 +7,15 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.cliente import Cliente
 from app.models.usuario import Usuario
-from app.schemas.core import ClienteBusquedaOut, ClienteCreate, ClienteOut, ClienteUpdate
+from app.schemas.core import (
+    ClienteBusquedaOut,
+    ClienteCreate,
+    ClienteOut,
+    ClienteUpdate,
+    CuentaFiadoOut,
+    PagoFiadoCreate,
+    PagoFiadoOut,
+)
 from app.services.core_service import (
     buscar_clientes,
     create_cliente,
@@ -15,6 +23,8 @@ from app.services.core_service import (
     get_cliente,
     get_cliente_by_dni,
     get_clientes,
+    get_cuenta_fiado,
+    registrar_pago_fiado,
     update_cliente,
 )
 
@@ -68,6 +78,29 @@ def obtener(cliente_id: int, db: Session = Depends(get_db), _: Usuario = Depends
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     return cliente
+
+
+@router.get("/{cliente_id}/movimientos", response_model=CuentaFiadoOut)
+def movimientos_fiado(cliente_id: int, db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)):
+    """Saldo de fiado del cliente y sus movimientos (ADMIN y CAJERO)."""
+    cuenta = get_cuenta_fiado(db, cliente_id)
+    if not cuenta:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    return cuenta
+
+
+@router.post("/{cliente_id}/pagos", response_model=PagoFiadoOut, status_code=status.HTTP_201_CREATED)
+def pagar_fiado(
+    cliente_id: int,
+    datos: PagoFiadoCreate,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """Registra un pago de deuda de fiado (ADMIN y CAJERO). Devuelve el saldo que queda."""
+    pago = registrar_pago_fiado(db, cliente_id, usuario.id, datos)
+    if not pago:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    return pago
 
 
 @router.post("", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
