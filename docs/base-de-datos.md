@@ -18,6 +18,7 @@ erDiagram
     clientes ||--o{ movimientos_fiado : "tiene cuenta"
     usuarios ||--o{ movimientos_fiado : "registra"
     ventas |o--o| movimientos_fiado : "genera deuda"
+    cierres_caja |o--o{ movimientos_fiado : "cobra pagos"
 
     usuarios {
         int id PK
@@ -81,6 +82,7 @@ erDiagram
         text observaciones
         decimal monto_inicial
         decimal efectivo_contado
+        decimal total_cobros_fiado
         decimal diferencia "calculada por la base"
     }
     movimientos_fiado {
@@ -92,6 +94,7 @@ erDiagram
         decimal monto
         timestamptz fecha
         text observaciones
+        int cierre_id FK "solo en PAGO"
     }
 ```
 
@@ -107,6 +110,7 @@ Cómo leer las relaciones:
 | `productos` → `detalle_ventas` | 1 a muchos | Cada línea de venta es de un producto. |
 | `clientes` → `movimientos_fiado` | 1 a muchos | La cuenta corriente del fiado de cada cliente. |
 | `usuarios` → `movimientos_fiado` | 1 a muchos | Quién registró la venta fiada o cobró el pago. |
+| `cierres_caja` → `movimientos_fiado` | 0 o 1 a muchos | Un pago de deuda entra en el cierre del turno en que se cobró. |
 | `ventas` → `movimientos_fiado` | 0 o 1 a 0 o 1 | Cada venta fiada genera exactamente un movimiento `VENTA`; las demás ventas, ninguno. |
 
 ## Tablas
@@ -134,11 +138,11 @@ Catálogo del kiosco.
 | `id` | `SERIAL` | No | autonumérico | Clave primaria. |
 | `codigo_barras` | `VARCHAR(50)` | No | | Código que lee el escáner del POS. Único. |
 | `nombre` | `VARCHAR(150)` | No | | Descripción del producto. |
-| `precio_costo` | `DECIMAL(12,2)` | No | | Precio de compra. Solo lo ve el administrador. `>= 0`. |
+| `precio_costo` | `DECIMAL(12,2)` | No | | Precio de compra. Solo lo ve el administrador: la API no se lo manda al cajero. `>= 0`. |
 | `precio_venta` | `DECIMAL(12,2)` | No | | Precio de lista. `>= 0`. |
 | `stock_actual` | `INT` | No | `0` | Unidades disponibles. Baja con cada venta. `>= 0`. |
-| `stock_minimo` | `INT` | No | `5` | Por debajo de este valor el producto entra en alerta de stock bajo. `>= 0`. |
-| `activo` | `BOOLEAN` | No | `TRUE` | Baja lógica: un producto con ventas no se puede borrar, pero sí desactivar. |
+| `stock_minimo` | `INT` | No | `5` | Con `stock_actual <= stock_minimo` el producto entra en las alertas de stock (campanita y Dashboard). `>= 0`. |
+| `activo` | `BOOLEAN` | No | `TRUE` | Baja lógica: un producto con ventas no se puede borrar, pero sí dar de baja. Dado de baja no aparece en la Caja ni se puede vender; el administrador lo puede reactivar. |
 
 ### `clientes`
 
@@ -207,9 +211,10 @@ Cierre de turno (arqueo) de cada cajero.
 | `observaciones` | `TEXT` | Sí | | Comentario libre del cajero. |
 | `monto_inicial` | `DECIMAL(12,2)` | No | `0` | Fondo de caja con el que arrancó el turno. `>= 0`. |
 | `efectivo_contado` | `DECIMAL(12,2)` | Sí | | Efectivo que contó el cajero al cerrar. `NULL` si no se contó. `>= 0`. |
-| `diferencia` | `DECIMAL(12,2)` | Sí | calculada | `efectivo_contado - monto_inicial - total_efectivo`. Negativa = faltante, positiva = sobrante. La calcula la base y no se puede escribir. |
+| `total_cobros_fiado` | `DECIMAL(12,2)` | No | `0` | Pagos de deuda de fiado cobrados en efectivo durante el turno (también entran en la caja). `>= 0`. |
+| `diferencia` | `DECIMAL(12,2)` | Sí | calculada | `efectivo_contado - monto_inicial - total_efectivo - total_cobros_fiado`. Negativa = faltante, positiva = sobrante. La calcula la base y no se puede escribir. |
 
-Las ventas fiadas cuentan en `cantidad_ventas` pero no suman a ningún total, porque no entra plata en la caja. Así la `diferencia` del arqueo sigue dando bien.
+Las ventas fiadas cuentan en `cantidad_ventas` pero no suman a ningún total, porque no entra plata en la caja. En cambio, cuando un cliente paga su deuda en efectivo esa plata sí entra: se suma en `total_cobros_fiado` y la `diferencia` del arqueo la tiene en cuenta.
 
 ### `movimientos_fiado`
 
@@ -225,8 +230,9 @@ Cuenta corriente del fiado: cada venta fiada suma deuda y cada pago la baja.
 | `monto` | `DECIMAL(12,2)` | No | | Siempre positivo; el signo lo da el `tipo`. `> 0`. |
 | `fecha` | `TIMESTAMPTZ` | No | ahora | |
 | `observaciones` | `TEXT` | Sí | | Comentario libre (por ejemplo, en un pago). |
+| `cierre_id` | `INT` | Sí | | FK a `cierres_caja`. Solo en los `PAGO`: cierre del turno en que se cobró. `NULL` mientras el turno sigue abierto (CHECK `movimientos_fiado_cierre_check`). |
 
-Los pagos de deuda se registran solo acá: por ahora no entran en el cierre de caja del turno.
+Los pagos se toman como cobrados en efectivo: al cerrar el turno se suman en `cierres_caja.total_cobros_fiado`.
 
 ## Vista `vista_ventas_descuento`
 
@@ -284,7 +290,8 @@ Además de los que PostgreSQL crea solo para las claves primarias y los campos �
 | `idx_cierres_caja_usuario_fecha` | "Mis cierres". |
 | `idx_cierres_caja_fecha` | Cierres de un período (reporte del administrador). |
 | `idx_movimientos_fiado_cliente_fecha` | Saldo y movimientos de la cuenta de un cliente. |
-| `idx_movimientos_fiado_usuario` | Control antes de borrar un usuario. |
+| `idx_movimientos_fiado_usuario` | Cobros de fiado del turno abierto y control antes de borrar un usuario. |
+| `idx_movimientos_fiado_cierre` | Cobros de fiado de un cierre. |
 
 ## Datos iniciales
 

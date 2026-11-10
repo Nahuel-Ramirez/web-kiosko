@@ -32,11 +32,14 @@ export function Dashboard() {
       fechaDesde.setDate(fechaDesde.getDate() - 30);
       try {
         const misVentas = await obtenerMisVentas(hoy, hoy);
-        try {
-          const pico = await fetchHorasPico(fechaDesde.toISOString().split('T')[0], hoy.toISOString().split('T')[0]);
-          setRecomendaciones(pico?.recomendaciones || []);
-        } catch {
-          setRecomendaciones([]);
+        // Las recomendaciones salen del reporte de horas pico, que es solo para el administrador.
+        if (isAdmin) {
+          try {
+            const pico = await fetchHorasPico(fechaDesde.toISOString().split('T')[0], hoy.toISOString().split('T')[0]);
+            if (!cancelado) setRecomendaciones(pico?.recomendaciones || []);
+          } catch {
+            if (!cancelado) setRecomendaciones([]);
+          }
         }
         let resumen = {
           cantidad: misVentas.length,
@@ -123,7 +126,7 @@ export function Dashboard() {
                     <strong>{item.name}</strong>
                     <small>Stock: {item.stock}</small>
                   </div>
-                  <span className={getStockTagClass(item.stock)}>{getStockStatus(item.stock).label}</span>
+                  <span className={getStockTagClass(item.stock, item.minStock)}>{getStockStatus(item.stock, item.minStock).label}</span>
                 </li>
               ))
             )}

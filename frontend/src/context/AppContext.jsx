@@ -13,6 +13,7 @@ import {
   obtenerTurnoActual,
   crearCierre as crearCierreRequest
 } from '../services/turnoService';
+import { listarDeudores } from '../services/fiadoService';
 
 const AppContext = createContext(null);
 
@@ -26,6 +27,9 @@ export function AppProvider({ children }) {
   const [cashReceived, setCashReceived] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
   const [activePanel, setActivePanel] = useState('dashboard');
+  const [deudores, setDeudores] = useState([]);
+  const [deudoresError, setDeudoresError] = useState('');
+  const esAdmin = currentUser?.role === 'Administrador';
 
   const loadProducts = useCallback(async () => {
     setProductsLoading(true);
@@ -52,6 +56,28 @@ export function AppProvider({ children }) {
     }
   }, [currentUser, loadProducts]);
 
+  // Clientes con deuda de fiado: solo el administrador puede verlos (pestaña Fiados y alertas).
+  const cargarDeudores = useCallback(async () => {
+    if (!esAdmin) {
+      setDeudores([]);
+      setDeudoresError('');
+      return;
+    }
+    try {
+      setDeudores(await listarDeudores());
+      setDeudoresError('');
+    } catch (err) {
+      setDeudoresError(err.message || 'No se pudieron cargar los clientes con deuda.');
+    }
+  }, [esAdmin]);
+
+  useEffect(() => {
+    cargarDeudores();
+  }, [cargarDeudores]);
+
+  const getFiadoAlertas = useCallback(() => {
+    return deudores.filter(deudor => Number(deudor.saldo) >= Number(deudor.limite_fiado));
+  }, [deudores]);
 
   const formatMoney = useCallback((value) => {
     return new Intl.NumberFormat('es-AR', {
@@ -61,9 +87,10 @@ export function AppProvider({ children }) {
     }).format(value);
   }, []);
 
+  // Alerta de stock: el producto llegó a su stock mínimo (o se quedó sin stock).
   const getLowStockProducts = useCallback(() => {
     return products
-      .filter((product) => product.stock <= 100)
+      .filter((product) => product.stock <= product.minStock)
       .sort((a, b) => a.stock - b.stock);
   }, [products]);
 
@@ -169,14 +196,16 @@ export function AppProvider({ children }) {
     const totalC = subtotalC - descuentoC;
     const metodo = paymentMethod.toUpperCase();
     const esEfectivo = metodo === 'EFECTIVO';
+    const esFiado = metodo === 'FIADO';
     const recibidoC = esEfectivo ? aCentavos(cashReceived || 0) : totalC;
 
     return {
       cliente_id: clienteId || 1,
       total: aPesos(totalC),
       metodo_pago: metodo,
-      monto_recibido: aPesos(recibidoC),
-      vuelto: aPesos(Math.max(recibidoC - totalC, 0)),
+      // En una venta fiada no se cobra nada en el momento.
+      monto_recibido: esFiado ? null : aPesos(recibidoC),
+      vuelto: esFiado ? null : aPesos(Math.max(recibidoC - totalC, 0)),
       detalles: lineas.map((linea, i) => ({
         producto_id: linea.item.id,
         cantidad: linea.item.quantity,
@@ -217,10 +246,18 @@ export function AppProvider({ children }) {
   // Totales del turno abierto, calculados en el servidor.
   const getTotalesDelTurno = useCallback(async () => {
     const turno = await obtenerTurnoActual();
+    // Lo fiado cuenta como venta del turno pero no entra plata en la caja.
+    const totalFiado = (turno.ventas || [])
+      .filter(venta => venta.metodo_pago === 'FIADO')
+      .reduce((sum, venta) => sum + Number(venta.total), 0);
     return {
       totalEfectivo: Number(turno.total_efectivo),
       totalTarjeta: Number(turno.total_tarjeta),
       totalTransferencia: Number(turno.total_transferencia || 0),
+      totalFiado,
+      // Pagos de deuda cobrados en efectivo en el turno: también entran en la caja.
+      totalCobrosFiado: Number(turno.total_cobros_fiado || 0),
+      cantidadCobrosFiado: turno.cantidad_cobros_fiado || 0,
       cantidad: turno.cantidad_ventas,
       totalGeneral: Number(turno.total_general)
     };
@@ -229,9 +266,9 @@ export function AppProvider({ children }) {
   // El servidor asocia las ventas abiertas al cierre, calcula los totales y la
   // diferencia del arqueo (efectivo contado - monto inicial - efectivo vendido).
   const crearCierre = useCallback(async ({ montoInicial, efectivoContado }) => {
-    const { cantidad } = await getTotalesDelTurno();
-    if (cantidad === 0) {
-      throw new Error('No hay ventas en este turno para cerrar');
+    const { cantidad, cantidadCobrosFiado } = await getTotalesDelTurno();
+    if (cantidad === 0 && cantidadCobrosFiado === 0) {
+      throw new Error('No hay ventas ni cobros de fiado en este turno para cerrar');
     }
     return crearCierreRequest({
       monto_inicial: Number(montoInicial || 0).toFixed(2),
@@ -268,7 +305,11 @@ export function AppProvider({ children }) {
     cancelSale,
     updateCashReceived,
     getTotalesDelTurno,
-    crearCierre
+    crearCierre,
+    deudores,
+    deudoresError,
+    cargarDeudores,
+    getFiadoAlertas
   };
 
   return (

@@ -1,8 +1,15 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_URL } from './api';
 
 function getAuthHeaders() {
   const token = localStorage.getItem('web_kiosko_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// El backend devuelve detail como texto (reglas de negocio) o como lista (validación 422).
+async function mensajeDeError(response, porDefecto) {
+  const err = await response.json().catch(() => ({}));
+  if (Array.isArray(err.detail)) return err.detail.map(d => d.msg.replace(/^Value error, /, '')).join('. ');
+  return err.detail || porDefecto;
 }
 
 export async function buscarCliente(dni) {
@@ -31,10 +38,7 @@ export async function crearCliente(datos) {
     },
     body: JSON.stringify(datos),
   });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || 'Error al crear cliente');
-  }
+  if (!response.ok) throw new Error(await mensajeDeError(response, 'Error al crear cliente'));
   return response.json();
 }
 
@@ -47,10 +51,7 @@ export async function editarCliente(id, datos) {
     },
     body: JSON.stringify(datos),
   });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || 'Error al editar cliente');
-  }
+  if (!response.ok) throw new Error(await mensajeDeError(response, 'Error al editar cliente'));
   return response.json();
 }
 
@@ -59,8 +60,5 @@ export async function eliminarCliente(id) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || 'Error al eliminar cliente');
-  }
+  if (!response.ok) throw new Error(await mensajeDeError(response, 'Error al eliminar cliente'));
 }

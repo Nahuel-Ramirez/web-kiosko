@@ -78,7 +78,12 @@ export function TicketVenta({ venta, width = '80mm', onPrint, onClose }) {
             <span>Método:</span>
             <strong>{venta.metodo_pago || venta.method}</strong>
           </div>
-          {venta.monto_recibido && (
+          {venta.metodo_pago === 'FIADO' && (
+            <div className="ticket-total-row">
+              <span>Queda en la cuenta del cliente</span>
+            </div>
+          )}
+          {venta.monto_recibido > 0 && (
             <>
               <div className="ticket-total-row">
                 <span>Recibido:</span>

@@ -9,6 +9,7 @@ import {
 } from '../services/clienteService';
 
 const LIMITE_FIADO_POR_DEFECTO = '10000';
+const CONSUMIDOR_FINAL_ID = 1;
 
 const FORM_VACIO = {
   tipo: 'persona',
@@ -183,6 +184,7 @@ export function Clientes() {
                   value={formData.dni_cuit}
                   onChange={handleChange}
                   placeholder="Ej: 20123456789"
+                  inputMode="numeric"
                   required
                 />
               </div>
@@ -320,7 +322,7 @@ export function Clientes() {
                     <th>Teléfono</th>
                     <th>Límite fiado</th>
                     <th>Estado</th>
-                    <th>Acciones</th>
+                    {esAdmin && <th>Acciones</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -352,24 +354,30 @@ export function Clientes() {
                           {cliente.activo === false ? 'Inactivo' : 'Activo'}
                         </span>
                       </td>
-                      <td>
-                        <div className="action-buttons">
-                          <button
-                            className="mini-btn edit-btn"
-                            onClick={() => handleEditar(cliente)}
-                            disabled={deletingId !== null}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            className="mini-btn danger"
-                            onClick={() => handleEliminar(cliente)}
-                            disabled={deletingId !== null || saving}
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </td>
+                      {/* Editar y eliminar clientes es del administrador (el backend responde 403 al cajero).
+                          Consumidor Final no se toca. */}
+                      {esAdmin && (
+                        <td>
+                          {cliente.id !== CONSUMIDOR_FINAL_ID && (
+                            <div className="action-buttons">
+                              <button
+                                className="mini-btn edit-btn"
+                                onClick={() => handleEditar(cliente)}
+                                disabled={deletingId !== null}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                className="mini-btn danger"
+                                onClick={() => handleEliminar(cliente)}
+                                disabled={deletingId !== null || saving}
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_URL } from './api';
 
 function getAuthHeaders() {
   const token = localStorage.getItem('web_kiosko_token');

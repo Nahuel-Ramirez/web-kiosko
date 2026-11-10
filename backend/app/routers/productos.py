@@ -15,6 +15,7 @@ from app.services.core_service import (
     create_producto,
     delete_producto,
     get_producto,
+    get_producto_bloqueado,
     get_producto_by_codigo,
     get_productos,
     update_producto,
@@ -42,17 +43,29 @@ def admin_o_cajero(usuario: Usuario = Depends(get_current_user)) -> Usuario:
     return usuario
 
 
-@router.get("", response_model=List[ProductoOut])
+def _para_rol(producto, usuario: Usuario) -> ProductoOut:
+    """El precio de costo es información del dueño: al cajero no se le manda."""
+    salida = ProductoOut.model_validate(producto)
+    if usuario.rol != "ADMIN":
+        salida.precio_costo = None
+    return salida
+
+
+# response_model_exclude_none: para el cajero el campo precio_costo directamente no aparece.
+@router.get("", response_model=List[ProductoOut], response_model_exclude_none=True)
 def listar_productos(
     skip: int = 0,
     limit: int = 100,
     buscar: Optional[str] = Query(None, description="Buscar por nombre o código de barras"),
     solo_stock_bajo: bool = Query(False, description="Filtrar productos con stock <= stock_minimo"),
+    incluir_inactivos: bool = Query(False, description="Incluir los dados de baja (solo ADMIN)"),
     db: Session = Depends(get_db),
-    _: Usuario = Depends(admin_o_cajero),
+    usuario: Usuario = Depends(admin_o_cajero),
 ):
     """Lista productos con filtros por stock y búsqueda por nombre/código."""
-    productos = get_productos(db, skip=skip, limit=limit)
+    productos = get_productos(
+        db, skip=skip, limit=limit, incluir_inactivos=incluir_inactivos and usuario.rol == "ADMIN"
+    )
 
     #Filtro de busqueda por nombre o codigo de barra
     if buscar:
@@ -66,33 +79,33 @@ def listar_productos(
     if solo_stock_bajo:
         productos = [p for p in productos if p.stock_actual <= p.stock_minimo]
 
-    return productos
+    return [_para_rol(p, usuario) for p in productos]
 
 
-@router.get("/{producto_id}", response_model=ProductoOut)
+@router.get("/{producto_id}", response_model=ProductoOut, response_model_exclude_none=True)
 def obtener_producto(
     producto_id: int,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(admin_o_cajero),
+    usuario: Usuario = Depends(admin_o_cajero),
 ):
     """Obtiene un producto por ID."""
     producto = get_producto(db, producto_id)
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return producto
+    return _para_rol(producto, usuario)
 
 
-@router.get("/codigo/{codigo_barras}", response_model=ProductoOut)
+@router.get("/codigo/{codigo_barras}", response_model=ProductoOut, response_model_exclude_none=True)
 def obtener_por_codigo(
     codigo_barras: str,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(admin_o_cajero),
+    usuario: Usuario = Depends(admin_o_cajero),
 ):
-    """Busca producto por código de barras (para lector de código en POS)."""
+    """Busca producto por código de barras (para lector de código en POS). Los dados de baja no aparecen."""
     producto = get_producto_by_codigo(db, codigo_barras)
-    if not producto:
+    if not producto or not producto.activo:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return producto
+    return _para_rol(producto, usuario)
 
 
 @router.post("", response_model=ProductoOut, status_code=status.HTTP_201_CREATED)
@@ -134,7 +147,7 @@ def agregar_stock(
     _: Usuario = Depends(solo_admin),
 ):
     """Agrega stock a un producto existente (solo ADMIN). Suma la cantidad al stock actual."""
-    producto = get_producto(db, producto_id)
+    producto = get_producto_bloqueado(db, producto_id)
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
@@ -152,7 +165,7 @@ def setear_stock(
     _: Usuario = Depends(solo_admin),
 ):
     """Establece el stock a un valor exacto (solo ADMIN)."""
-    producto = get_producto(db, producto_id)
+    producto = get_producto_bloqueado(db, producto_id)
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
@@ -168,6 +181,6 @@ def eliminar_producto(
     db: Session = Depends(get_db),
     _: Usuario = Depends(solo_admin),
 ):
-    """Elimina un producto (solo ADMIN)."""
+    """Elimina un producto (solo ADMIN). Si tiene ventas responde 409: se da de baja con PUT {"activo": false}."""
     if not delete_producto(db, producto_id):
         raise HTTPException(status_code=404, detail="Producto no encontrado")

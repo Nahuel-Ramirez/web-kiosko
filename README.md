@@ -134,6 +134,16 @@ Cada integrante corre la app en su propia PC, con su propia base PostgreSQL. El 
    ```
 4. **Frontend** (desde `frontend/`): `npm install` y `npm run dev` → http://localhost:5173
 
+### Probar desde el celular
+
+Con el celular conectado al mismo WiFi que la PC:
+
+1. Levantar el backend escuchando en la red: `uvicorn app.main:app --reload --host 0.0.0.0`.
+2. `npm run dev` ya muestra la dirección de red (`Network: http://192.168.x.x:5173`). Abrir esa dirección en el celular.
+3. Si no carga, permitir Python y Node en el firewall de Windows (redes privadas).
+
+El frontend busca la API en la misma máquina desde la que se abrió (puerto 8000), y el backend acepta pedidos desde las IP de red local, así que no hay que configurar nada más. No hace falta definir `VITE_API_URL` en el `.env`; si está definida con `localhost`, desde el celular no va a andar.
+
 ### Datos de ejemplo
 
 `python -m app.db.demo` carga datos **ficticios** para mostrar la app:
@@ -166,9 +176,10 @@ Documentación interactiva completa en `http://localhost:8000/docs` con el backe
 | Productos | `GET /api/productos`, `GET /api/productos/codigo/{codigo}` (ADMIN y CAJERO); alta, edición, stock y baja (ADMIN) | Según rol |
 | Clientes | `GET /api/clientes/buscar?dni=`, `GET/POST /api/clientes` (ADMIN y CAJERO); `PUT/DELETE` (ADMIN) | Según rol |
 | Ventas y turnos | `POST /api/turnos/ventas`, `GET /api/turnos/mis-ventas`, `GET /api/turnos/turno-actual`, `POST /api/turnos/cierre`, `GET /api/turnos/mis-cierres`, `GET /api/turnos/cierre/{id}` | Logueado |
+| Fiado | `GET /api/clientes/{id}/movimientos`, `POST /api/clientes/{id}/pagos` (ADMIN y CAJERO); `GET /api/fiados/deudores` (ADMIN) | Según rol |
 | Reportes de ventas | `GET /api/turnos/reporte/periodo`, `GET /api/turnos/reporte/usuario/{id}` | ADMIN |
 | Analítica | `GET /api/reportes/ventas-por-hora`, `GET /api/reportes/horas-pico`, `GET /api/reportes/productos-mas-vendidos` (HU-09) | ADMIN |
 
-Reglas de negocio relevantes: una venta se guarda de forma atómica (valida cliente, productos, stock suficiente y que el total coincida con el detalle); `metodo_pago` solo admite `EFECTIVO`, `TARJETA` o `TRANSFERENCIA`; el cierre de caja vincula las ventas abiertas del cajero y calcula los totales en el servidor; las fechas de los reportes (`YYYY-MM-DD`) incluyen el día completo.
+Reglas de negocio relevantes: una venta se guarda de forma atómica (valida cliente, productos, stock suficiente y que el total coincida con el detalle); `metodo_pago` admite `EFECTIVO`, `TARJETA`, `TRANSFERENCIA` o `FIADO` (este último solo a un cliente activo, distinto de Consumidor Final y sin pasarse de su `limite_fiado`); el cierre de caja vincula las ventas abiertas del cajero y calcula los totales en el servidor; las fechas de los reportes (`YYYY-MM-DD`) incluyen el día completo.
 
 Tests: `cd backend && python -m pytest`.

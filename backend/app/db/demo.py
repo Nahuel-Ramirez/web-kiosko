@@ -257,6 +257,8 @@ def borrar(db: Session) -> Dict[str, int]:
         db.query(Venta).filter(Venta.id.in_(ventas or [-1])).delete(synchronize_session=False)
         # si quedara alguna venta real dentro de un cierre de ejemplo, se desvincula antes de borrarlo
         db.query(Venta).filter(Venta.cierre_id.in_(cierres or [-1])).update({Venta.cierre_id: None}, synchronize_session=False)
+        db.query(MovimientoFiado).filter(MovimientoFiado.cierre_id.in_(cierres or [-1])).update(
+            {MovimientoFiado.cierre_id: None}, synchronize_session=False)
         db.query(CierreCaja).filter(CierreCaja.id.in_(cierres or [-1])).delete(synchronize_session=False)
         db.query(Producto).filter(Producto.id.in_(productos or [-1])).delete(synchronize_session=False)
         db.query(Cliente).filter(Cliente.id.in_(clientes or [-1])).delete(synchronize_session=False)

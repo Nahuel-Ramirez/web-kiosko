@@ -108,7 +108,9 @@ def get_cliente_by_dni(db: Session, dni_cuit: str) -> Optional[Cliente]:
 def buscar_clientes(db: Session, termino: str, limite: int = 10) -> List[Cliente]:
     """Busca por DNI/CUIT (prefijo) o por razon social (contiene)."""
     termino = termino.strip()
-    like_doc = termino + "%"
+    # Los documentos se guardan sin puntos ni guiones: "20-1234" tambien encuentra "201234...".
+    doc = termino.replace(".", "").replace("-", "").replace(" ", "")
+    like_doc = (doc if doc.isdigit() else termino) + "%"
     like_nombre = "%" + termino + "%"
     return (
         db.query(Cliente)
@@ -154,12 +156,21 @@ def delete_cliente(db: Session, cliente_id: int) -> bool:
 
 
 # ===== PRODUCTOS =====
-def get_productos(db: Session, skip: int = 0, limit: int = 100) -> List[Producto]:
-    return db.query(Producto).offset(skip).limit(limit).all()
+def get_productos(db: Session, skip: int = 0, limit: int = 100, incluir_inactivos: bool = False) -> List[Producto]:
+    query = db.query(Producto)
+    if not incluir_inactivos:
+        query = query.filter(Producto.activo.is_(True))
+    return query.order_by(Producto.id).offset(skip).limit(limit).all()
 
 
 def get_producto(db: Session, producto_id: int) -> Optional[Producto]:
     return db.query(Producto).filter(Producto.id == producto_id).first()
+
+
+def get_producto_bloqueado(db: Session, producto_id: int) -> Optional[Producto]:
+    """Lee el producto bloqueando su fila hasta el commit, para que dos operaciones de stock
+    simultaneas (dos ventas, o una venta y un ajuste) no lean el mismo valor y se pisen."""
+    return db.query(Producto).filter(Producto.id == producto_id).with_for_update().first()
 
 
 def get_producto_by_codigo(db: Session, codigo_barras: str) -> Optional[Producto]:
@@ -190,7 +201,9 @@ def delete_producto(db: Session, producto_id: int) -> bool:
     if not producto:
         return False
     if db.query(DetalleVenta).filter(DetalleVenta.producto_id == producto_id).first():
-        raise ReglaNegocioError("El producto tiene ventas registradas; no se puede eliminar", status_code=409)
+        raise ReglaNegocioError(
+            "El producto tiene ventas registradas; no se puede eliminar, pero se puede dar de baja", status_code=409
+        )
     db.delete(producto)
     db.commit()
     return True
@@ -227,11 +240,16 @@ def create_venta(db: Session, usuario_id: int, datos: VentaCreate) -> Venta:
     for det in datos.detalles:
         pedido[det.producto_id] = pedido.get(det.producto_id, 0) + det.cantidad
 
+    # Los productos se bloquean en orden de id: dos ventas simultaneas del mismo producto
+    # esperan una a la otra en vez de pisarse el stock, y no pueden trabarse entre si.
     productos = {}
-    for producto_id, cantidad in pedido.items():
-        producto = get_producto(db, producto_id)
+    for producto_id in sorted(pedido):
+        cantidad = pedido[producto_id]
+        producto = get_producto_bloqueado(db, producto_id)
         if not producto:
             raise ReglaNegocioError("El producto %s no existe" % producto_id)
+        if not producto.activo:
+            raise ReglaNegocioError("'%s' esta dado de baja y no se puede vender" % producto.nombre)
         if producto.stock_actual < cantidad:
             raise ReglaNegocioError(
                 "Stock insuficiente para '%s' (disponible: %s, pedido: %s)"
@@ -335,9 +353,23 @@ def _totales_ventas(ventas: List[Venta]):
     return total_efectivo, total_tarjeta, total_transferencia
 
 
+def get_cobros_fiado_abiertos(db: Session, usuario_id: int) -> List[MovimientoFiado]:
+    """Pagos de deuda que cobro el usuario y todavia no entraron en ningun cierre de caja."""
+    return (
+        db.query(MovimientoFiado)
+        .filter(
+            MovimientoFiado.usuario_id == usuario_id,
+            MovimientoFiado.tipo == "PAGO",
+            MovimientoFiado.cierre_id.is_(None),
+        )
+        .all()
+    )
+
+
 def get_turno_actual(db: Session, usuario_id: int) -> dict:
-    """Resumen del turno abierto (ventas aun sin cierre) calculado en el servidor."""
+    """Resumen del turno abierto (ventas y cobros de fiado aun sin cierre) calculado en el servidor."""
     ventas = get_ventas_abiertas(db, usuario_id)
+    cobros = get_cobros_fiado_abiertos(db, usuario_id)
     total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
     return {
         "cantidad_ventas": len(ventas),
@@ -345,6 +377,8 @@ def get_turno_actual(db: Session, usuario_id: int) -> dict:
         "total_tarjeta": total_tarjeta,
         "total_transferencia": total_transferencia,
         "total_general": total_efectivo + total_tarjeta + total_transferencia,
+        "total_cobros_fiado": sum((c.monto for c in cobros), Decimal("0")),
+        "cantidad_cobros_fiado": len(cobros),
         "ventas": ventas,
     }
 
@@ -357,12 +391,14 @@ def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> Cier
     Si no hay ventas abiertas se conservan los totales enviados (compatibilidad
     con el frontend que aun calcula el turno de forma local).
 
-    El arqueo (monto_inicial, efectivo_contado) es obligatorio.
-    La diferencia se calcula en la BD: efectivo_contado - monto_inicial - total_efectivo
+    Los pagos de deuda de fiado cobrados en el turno tambien entran en la caja: se
+    asocian al cierre y se suman en total_cobros_fiado.
+
+    El arqueo (monto_inicial, efectivo_contado) es obligatorio. La diferencia se calcula
+    en la BD: efectivo_contado - monto_inicial - total_efectivo - total_cobros_fiado
     """
-    import sys
-    print("DEBUG service: datos.monto_inicial=" + str(datos.monto_inicial) + ", datos.efectivo_contado=" + str(datos.efectivo_contado), file=sys.stderr, flush=True)
     ventas = get_ventas_abiertas(db, usuario_id)
+    cobros = get_cobros_fiado_abiertos(db, usuario_id)
     if ventas:
         total_efectivo, total_tarjeta, total_transferencia = _totales_ventas(ventas)
         cantidad = len(ventas)
@@ -373,7 +409,6 @@ def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> Cier
 
     # Validar arqueo obligatorio
     if datos.efectivo_contado is None:
-        from app.services.core_service import ReglaNegocioError
         raise ReglaNegocioError("El arqueo de caja es obligatorio: debe indicar efectivo_contado", status_code=400)
 
     cierre = CierreCaja(
@@ -381,6 +416,7 @@ def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> Cier
         total_efectivo=total_efectivo,
         total_tarjeta=total_tarjeta,
         total_transferencia=total_transferencia,
+        total_cobros_fiado=sum((c.monto for c in cobros), Decimal("0")),
         cantidad_ventas=cantidad,
         observaciones=datos.observaciones,
         monto_inicial=datos.monto_inicial,
@@ -391,6 +427,8 @@ def create_cierre(db: Session, usuario_id: int, datos: CierreCajaCreate) -> Cier
         db.flush()
         for venta in ventas:
             venta.cierre_id = cierre.id
+        for cobro in cobros:
+            cobro.cierre_id = cierre.id
         db.commit()
     except Exception:
         db.rollback()
@@ -422,7 +460,12 @@ def _calcular_diferencia(cierre: CierreCaja) -> Optional[Decimal]:
     anteriores al arqueo) la diferencia es NULL, no un faltante por el total vendido."""
     if cierre.efectivo_contado is None:
         return None
-    return cierre.efectivo_contado - (cierre.monto_inicial or 0) - (cierre.total_efectivo or 0)
+    return (
+        cierre.efectivo_contado
+        - (cierre.monto_inicial or 0)
+        - (cierre.total_efectivo or 0)
+        - (cierre.total_cobros_fiado or 0)
+    )
 
 def get_cierre(db: Session, cierre_id: int) -> Optional[CierreCaja]:
     cierre = db.query(CierreCaja).filter(CierreCaja.id == cierre_id).first()
@@ -624,6 +667,7 @@ def get_cuenta_fiado(db: Session, cliente_id: int) -> Optional[dict]:
     return {
         "cliente_id": cliente.id,
         "razon_social": cliente.razon_social,
+        "activo": cliente.activo,
         "limite_fiado": limite,
         "saldo": saldo,
         "disponible": limite - saldo,
@@ -634,8 +678,14 @@ def get_cuenta_fiado(db: Session, cliente_id: int) -> Optional[dict]:
 def get_deudores(db: Session) -> List[dict]:
     """Clientes que deben algo, de mayor a menor deuda."""
     saldo = func.sum(_monto_con_signo())
+    ultimo_fiado = func.max(case((MovimientoFiado.tipo == "VENTA", MovimientoFiado.fecha)))
     filas = (
-        db.query(Cliente, saldo.label("saldo"), func.max(MovimientoFiado.fecha).label("ultimo_movimiento"))
+        db.query(
+            Cliente,
+            saldo.label("saldo"),
+            ultimo_fiado.label("ultimo_fiado"),
+            func.max(MovimientoFiado.fecha).label("ultimo_movimiento"),
+        )
         .join(MovimientoFiado, MovimientoFiado.cliente_id == Cliente.id)
         .group_by(Cliente.id)
         .having(saldo > 0)
@@ -643,7 +693,7 @@ def get_deudores(db: Session) -> List[dict]:
         .all()
     )
     deudores = []
-    for cliente, saldo_cliente, ultimo in filas:
+    for cliente, saldo_cliente, fiado, ultimo in filas:
         limite = _dinero(cliente.limite_fiado)
         saldo_cliente = _dinero(saldo_cliente)
         deudores.append({
@@ -655,6 +705,7 @@ def get_deudores(db: Session) -> List[dict]:
             "limite_fiado": limite,
             "saldo": saldo_cliente,
             "disponible": limite - saldo_cliente,
+            "ultimo_fiado": fiado,
             "ultimo_movimiento": ultimo,
         })
     return deudores

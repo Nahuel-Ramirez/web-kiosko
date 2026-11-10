@@ -1,10 +1,20 @@
-﻿from datetime import datetime
+﻿import re
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 METODOS_PAGO_VALIDOS = {'EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'FIADO'}
 ROLES_VALIDOS = {'ADMIN', 'CAJERO'}
+
+
+def normalizar_dni_cuit(valor: str) -> str:
+    '''Saca puntos, guiones y espacios ("20-12345678-9" -> "20123456789") y valida el largo:
+    7 u 8 digitos para un DNI, 11 para un CUIT/CUIL.'''
+    limpio = re.sub(r'[\s.\-]', '', valor or '')
+    if not re.fullmatch(r'[0-9]{7,8}|[0-9]{11}', limpio):
+        raise ValueError('DNI/CUIT invalido: solo numeros, 7 u 8 digitos para DNI u 11 para CUIT/CUIL')
+    return limpio
 
 
 # ===== USUARIOS =====
@@ -70,6 +80,11 @@ class ClienteCreate(ClienteBase):
     # Para una persona alcanza con nombre y apellido: el backend arma razon_social.
     razon_social: Optional[str] = None
 
+    @field_validator('dni_cuit')
+    @classmethod
+    def validar_dni_cuit(cls, valor: str) -> str:
+        return normalizar_dni_cuit(valor)
+
     @model_validator(mode='after')
     def armar_razon_social(self):
         if self.nombre and self.apellido:
@@ -89,6 +104,11 @@ class ClienteUpdate(BaseModel):
     email: Optional[str] = None
     limite_fiado: Optional[Decimal] = Field(default=None, ge=0)
     activo: Optional[bool] = None
+
+    @field_validator('dni_cuit')
+    @classmethod
+    def validar_dni_cuit(cls, valor: Optional[str]) -> Optional[str]:
+        return None if valor is None else normalizar_dni_cuit(valor)
 
 
 class ClienteOut(ClienteBase):
@@ -120,12 +140,16 @@ class ProductoUpdate(BaseModel):
     precio_venta: Optional[Decimal] = Field(default=None, ge=0)
     stock_actual: Optional[int] = Field(default=None, ge=0)
     stock_minimo: Optional[int] = Field(default=None, ge=0)
+    activo: Optional[bool] = None
 
 
 class ProductoOut(ProductoBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    # El cajero no ve el precio de costo: para él la API lo omite (ver routers/productos.py).
+    precio_costo: Optional[Decimal] = None
+    activo: bool = True
 
 
 # ===== VENTAS =====
@@ -203,6 +227,7 @@ class CierreCajaOut(CierreCajaBase):
     usuario_nombre: Optional[str] = None
     # Los cierres anteriores al arqueo no tienen conteo de efectivo (NULL en la base).
     efectivo_contado: Optional[Decimal] = None
+    total_cobros_fiado: Decimal = Decimal('0')
     diferencia: Optional[Decimal] = None
 
 
@@ -227,6 +252,9 @@ class TurnoActualOut(BaseModel):
     total_tarjeta: Decimal
     total_transferencia: Decimal = Decimal('0')
     total_general: Decimal
+    # Pagos de deuda de fiado cobrados en efectivo en este turno (entran en la caja).
+    total_cobros_fiado: Decimal = Decimal('0')
+    cantidad_cobros_fiado: int = 0
     ventas: List[VentaOut] = []
 
 
@@ -331,6 +359,7 @@ class PagoFiadoOut(MovimientoFiadoOut):
 class CuentaFiadoOut(BaseModel):
     cliente_id: int
     razon_social: str
+    activo: bool = True
     limite_fiado: Decimal
     saldo: Decimal
     disponible: Decimal
@@ -346,6 +375,7 @@ class DeudorOut(BaseModel):
     limite_fiado: Decimal
     saldo: Decimal
     disponible: Decimal
+    ultimo_fiado: Optional[datetime] = None
     ultimo_movimiento: Optional[datetime] = None
 
 

@@ -170,6 +170,13 @@ input, select {
   transform: translateY(-1px);
 }
 
+/* Que se note cuando un botón no se puede usar (por ejemplo "Cobrar" con el carrito vacío) */
+.primary-btn:disabled, .secondary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .full {
   width: 100%;
 }
@@ -946,6 +953,65 @@ input, select {
   border-top: 2px solid var(--line);
   margin-top: 0.5rem;
   padding-top: 0.75rem;
+}
+
+.fiado-box {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.5rem 1rem;
+}
+
+.fiado-alerta {
+  margin-bottom: 1rem;
+}
+
+.fiado-subtitulo {
+  margin: 1.25rem 0 0.75rem;
+}
+
+.inventory-table tr.fila-seleccionada td {
+  background: #eff6ff;
+}
+
+.productos-inactivos {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.productos-inactivos h4 {
+  margin: 0 0 0.75rem;
+}
+
+.productos-inactivos ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.productos-inactivos li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.productos-inactivos li strong,
+.productos-inactivos li small {
+  display: block;
+}
+
+@media (min-width: 981px) {
+  .fiados-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
 }
 
 .cierre-btn {
@@ -2497,4 +2563,135 @@ kbd {
 .card-header .search-box .product-search-input-wrapper {
   flex: 1;
   width: 100%;
+}
+
+/* Tablet y celular (una sola columna). Va al final para pisar las reglas de arriba. */
+@media (max-width: 980px) {
+  /* minmax(0, 1fr): la columna no se estira al ancho de la fila del menú */
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Menú en una fila que se desliza, en vez de una columna de ~450px arriba de todo */
+  .sidebar {
+    padding: 0.75rem;
+    gap: 0.6rem;
+  }
+
+  .brand-mini {
+    padding: 0 0.25rem 0.6rem;
+  }
+
+  .nav {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 0.4rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-btn {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0.6rem 0.9rem;
+    white-space: nowrap;
+  }
+
+  .sidebar-footer {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 0;
+  }
+
+  .sidebar-footer .secondary-btn {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  /* Caja: catálogo más bajo para que el carrito y "Cobrar" queden a mano */
+  .checkout-panel .catalog-grid.scroll-y {
+    max-height: 45vh;
+  }
+
+  .card-header .search-box > *,
+  .card-header .search-box .product-search-wrapper {
+    min-width: 0;
+  }
+
+  /* Tamaños cómodos para tocar (44px) y letra de 16px para que el celular no haga zoom */
+  #cajaPanel button,
+  #cajaPanel input,
+  #cajaPanel select,
+  .modal-client-selector button,
+  .modal-client-selector input,
+  .modal-client-selector select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  #cajaPanel .cart-panel .card-header .secondary-btn {
+    flex: 1 1 100%;
+  }
+
+  #cajaPanel .qty-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 1.25rem;
+  }
+
+  /* Cantidad: un solo campo entre "-" y "+" (en pantalla chica no entran el número y el campo) */
+  #cajaPanel .qty-value {
+    display: none;
+  }
+
+  #cajaPanel .qty-btn.minus {
+    order: 1;
+  }
+
+  #cajaPanel .qty-input {
+    order: 2;
+    height: 44px;
+  }
+
+  #cajaPanel .qty-btn.plus {
+    order: 3;
+  }
+}
+
+@media (max-width: 700px) {
+  .main-panel {
+    padding: 1rem 0.75rem;
+  }
+
+  .card {
+    padding: 1rem;
+    border-radius: 16px;
+  }
+
+  .topbar h2 {
+    font-size: 1.5rem;
+  }
+
+  #cajaPanel .search-box {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  #cajaPanel .cart-item {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  #cajaPanel .cart-actions {
+    gap: 0.5rem;
+  }
+
+  .modal {
+    padding: 1rem;
+  }
 }

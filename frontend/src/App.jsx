@@ -11,6 +11,7 @@ import { Caja } from './components/Caja';
 import { Reportes } from './components/Reportes';
 import { PrediccionDemanda } from './components/PrediccionDemanda';
 import { Clientes } from './components/Clientes';
+import { Fiados } from './components/Fiados';
 import { getStockStatus, getStockTagClass } from './utils/stock';
 
 // En true muestra LoginVisual (mockup sin backend). En false usa el login
@@ -19,9 +20,11 @@ const DEMO_MODE = false;
 
 function AppContent() {
   const { currentUser, loading } = useAuth();
-  const { activePanel, setActivePanel, getLowStockProducts } = useApp();
+  const { activePanel, setActivePanel, getLowStockProducts, getFiadoAlertas, formatMoney } = useApp();
   const [alertasOpen, setAlertasOpen] = useState(false);
   const lowStockProducts = getLowStockProducts();
+  const fiadoAlertas = getFiadoAlertas();
+  const totalAlertas = lowStockProducts.length + fiadoAlertas.length;
 
   if (loading) {
     return null;
@@ -49,6 +52,8 @@ function AppContent() {
         return isAdmin ? <PrediccionDemanda /> : <Caja />;
       case 'clientes':
         return <Clientes />;
+      case 'fiados':
+        return isAdmin ? <Fiados /> : <Caja />;
       default:
         return <Dashboard />;
     }
@@ -71,31 +76,41 @@ function AppContent() {
                   {activePanel === 'reportes' && 'Reportes'}
                   {activePanel === 'prediccion' && 'Predicción de Demanda'}
                   {activePanel === 'clientes' && 'Clientes'}
+                  {activePanel === 'fiados' && 'Fiados'}
                 </h2>
               </div>
               <div className="topbar-actions">
                 <button
                   className="alertas-trigger"
-                  aria-label="Alertas de stock"
+                  aria-label="Alertas"
                   onClick={() => setAlertasOpen(!alertasOpen)}
                 >
-                  🔔{lowStockProducts.length > 0 ? ` (${lowStockProducts.length})` : ''}
+                  🔔{totalAlertas > 0 ? ` (${totalAlertas})` : ''}
                 </button>
-                {alertasOpen && lowStockProducts.length > 0 && (
+                {alertasOpen && totalAlertas > 0 && (
                   <div className="alertas-popup">
                     <div className="alertas-popup-header">
-                      <strong>Alertas de stock</strong>
+                      <strong>Alertas</strong>
                       <button className="alertas-close" onClick={() => setAlertasOpen(false)}>×</button>
                     </div>
                     <ul className="alertas-list">
+                      {fiadoAlertas.map(deudor => (
+                        <li key={`fiado-${deudor.cliente_id}`} className="alertas-item">
+                          <div>
+                            <strong>{deudor.razon_social}</strong>
+                            <small>Fiado: debe {formatMoney(Number(deudor.saldo))} de {formatMoney(Number(deudor.limite_fiado))}</small>
+                          </div>
+                          <span className="stock-tag tag critical">Límite</span>
+                        </li>
+                      ))}
                       {lowStockProducts.map(item => (
                         <li key={item.id} className="alertas-item">
                           <div>
                             <strong>{item.name}</strong>
                             <small>Stock: {item.stock}</small>
                           </div>
-                          <span className={`stock-tag ${getStockTagClass(item.stock)}`}>
-                            {getStockStatus(item.stock).label}
+                          <span className={`stock-tag ${getStockTagClass(item.stock, item.minStock)}`}>
+                            {getStockStatus(item.stock, item.minStock).label}
                           </span>
                         </li>
                       ))}
