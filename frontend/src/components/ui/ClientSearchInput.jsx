@@ -257,6 +257,7 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
                   value={createData.dni_cuit}
                   onChange={handleCreateChange}
                   placeholder="Ej: 20123456789"
+                  inputMode="numeric"
                   required
                   style={campoStyle}
                 />

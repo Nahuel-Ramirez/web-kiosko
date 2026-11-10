@@ -241,6 +241,23 @@ def test_clientes_crud_y_busqueda(client, cajero_h, admin_h):
     assert client.delete("/api/clientes/%s" % cid, headers=admin_h).status_code == 204
 
 
+def test_dni_cuit_solo_numeros_y_largo_correcto(client, cajero_h, admin_h):
+    def alta(doc):
+        return client.post("/api/clientes", headers=cajero_h, json={"dni_cuit": doc, "razon_social": "X"})
+
+    for invalido in ("abc12345", "123456", "123456789", "1234567890", "123456789012", ""):
+        assert alta(invalido).status_code == 422, invalido
+    r = alta("20-30111222-3")
+    assert r.status_code == 201 and r.json()["dni_cuit"] == "20301112223"
+    assert alta("20301112223").status_code == 400  # mismo CUIT escrito sin guiones: duplicado
+    assert alta("30.111.222").json()["dni_cuit"] == "30111222"
+    assert alta("1234567").status_code == 201
+
+    busc = client.get("/api/clientes/buscar?dni=20-3011", headers=cajero_h).json()
+    assert [c["cuit"] for c in busc] == ["20301112223"]
+    assert client.put("/api/clientes/%s" % r.json()["id"], headers=admin_h, json={"dni_cuit": "12"}).status_code == 422
+
+
 def test_no_se_borra_lo_que_tiene_ventas(client, cajero_h, admin_h, producto):
     client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1))
     assert client.delete("/api/productos/%s" % producto["id"], headers=admin_h).status_code == 409
