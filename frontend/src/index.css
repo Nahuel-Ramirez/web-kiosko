@@ -974,6 +974,40 @@ input, select {
   background: #eff6ff;
 }
 
+.productos-inactivos {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.productos-inactivos h4 {
+  margin: 0 0 0.75rem;
+}
+
+.productos-inactivos ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.productos-inactivos li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.productos-inactivos li strong,
+.productos-inactivos li small {
+  display: block;
+}
+
 @media (min-width: 981px) {
   .fiados-grid {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);

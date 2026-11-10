@@ -104,8 +104,13 @@ def pagar_fiado(
 
 
 @router.post("", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
-def crear(datos: ClienteCreate, db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)):
-    """Alta de cliente desde el POS (ADMIN y CAJERO)."""
+def crear(datos: ClienteCreate, db: Session = Depends(get_db), usuario: Usuario = Depends(get_current_user)):
+    """Alta de cliente desde el POS (ADMIN y CAJERO). El límite de fiado solo lo fija el ADMIN."""
+    if usuario.rol != "ADMIN" and "limite_fiado" in datos.model_fields_set:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el administrador puede fijar el límite de fiado",
+        )
     if get_cliente_by_dni(db, datos.dni_cuit):
         raise HTTPException(status_code=400, detail="Ya existe un cliente con ese DNI/CUIT")
     return create_cliente(db, datos)

@@ -87,9 +87,10 @@ export function AppProvider({ children }) {
     }).format(value);
   }, []);
 
+  // Alerta de stock: el producto llegó a su stock mínimo (o se quedó sin stock).
   const getLowStockProducts = useCallback(() => {
     return products
-      .filter((product) => product.stock <= 100)
+      .filter((product) => product.stock <= product.minStock)
       .sort((a, b) => a.stock - b.stock);
   }, [products]);
 
@@ -254,6 +255,9 @@ export function AppProvider({ children }) {
       totalTarjeta: Number(turno.total_tarjeta),
       totalTransferencia: Number(turno.total_transferencia || 0),
       totalFiado,
+      // Pagos de deuda cobrados en efectivo en el turno: también entran en la caja.
+      totalCobrosFiado: Number(turno.total_cobros_fiado || 0),
+      cantidadCobrosFiado: turno.cantidad_cobros_fiado || 0,
       cantidad: turno.cantidad_ventas,
       totalGeneral: Number(turno.total_general)
     };
@@ -262,9 +266,9 @@ export function AppProvider({ children }) {
   // El servidor asocia las ventas abiertas al cierre, calcula los totales y la
   // diferencia del arqueo (efectivo contado - monto inicial - efectivo vendido).
   const crearCierre = useCallback(async ({ montoInicial, efectivoContado }) => {
-    const { cantidad } = await getTotalesDelTurno();
-    if (cantidad === 0) {
-      throw new Error('No hay ventas en este turno para cerrar');
+    const { cantidad, cantidadCobrosFiado } = await getTotalesDelTurno();
+    if (cantidad === 0 && cantidadCobrosFiado === 0) {
+      throw new Error('No hay ventas ni cobros de fiado en este turno para cerrar');
     }
     return crearCierreRequest({
       monto_inicial: Number(montoInicial || 0).toFixed(2),

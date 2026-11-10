@@ -85,7 +85,9 @@ CREATE TABLE IF NOT EXISTS cierres_caja (
     observaciones TEXT,
     monto_inicial DECIMAL(12, 2) NOT NULL DEFAULT 0.00 CHECK (monto_inicial >= 0),
     efectivo_contado DECIMAL(12, 2) CHECK (efectivo_contado >= 0),
-    diferencia DECIMAL(12, 2) GENERATED ALWAYS AS (efectivo_contado - monto_inicial - total_efectivo) STORED
+    total_cobros_fiado DECIMAL(12, 2) NOT NULL DEFAULT 0.00 CHECK (total_cobros_fiado >= 0),
+    diferencia DECIMAL(12, 2)
+        GENERATED ALWAYS AS (efectivo_contado - monto_inicial - total_efectivo - total_cobros_fiado) STORED
 );
 
 -- HU-20: pago por transferencia. Si la base ya existía, agrega la columna sin romper nada.
@@ -94,14 +96,33 @@ ALTER TABLE cierres_caja ADD COLUMN IF NOT EXISTS total_transferencia DECIMAL(12
 -- Arqueo de caja: con cuánto arrancó la caja y cuánto efectivo contó el cajero al cerrar.
 -- La diferencia la calcula la base: negativa = faltante, positiva = sobrante,
 -- NULL = no se hizo el conteo.
+-- Los pagos de deuda de fiado que se cobran en efectivo durante el turno también entran en
+-- la caja (total_cobros_fiado), así que la diferencia los descuenta.
 ALTER TABLE cierres_caja ADD COLUMN IF NOT EXISTS monto_inicial DECIMAL(12, 2) NOT NULL DEFAULT 0.00;
 ALTER TABLE cierres_caja ADD COLUMN IF NOT EXISTS efectivo_contado DECIMAL(12, 2);
+ALTER TABLE cierres_caja ADD COLUMN IF NOT EXISTS total_cobros_fiado DECIMAL(12, 2) NOT NULL DEFAULT 0.00;
 ALTER TABLE cierres_caja ADD COLUMN IF NOT EXISTS diferencia DECIMAL(12, 2)
-    GENERATED ALWAYS AS (efectivo_contado - monto_inicial - total_efectivo) STORED;
+    GENERATED ALWAYS AS (efectivo_contado - monto_inicial - total_efectivo - total_cobros_fiado) STORED;
 ALTER TABLE cierres_caja DROP CONSTRAINT IF EXISTS cierres_caja_monto_inicial_check;
 ALTER TABLE cierres_caja ADD CONSTRAINT cierres_caja_monto_inicial_check CHECK (monto_inicial >= 0);
 ALTER TABLE cierres_caja DROP CONSTRAINT IF EXISTS cierres_caja_efectivo_contado_check;
 ALTER TABLE cierres_caja ADD CONSTRAINT cierres_caja_efectivo_contado_check CHECK (efectivo_contado >= 0);
+ALTER TABLE cierres_caja DROP CONSTRAINT IF EXISTS cierres_caja_total_cobros_fiado_check;
+ALTER TABLE cierres_caja ADD CONSTRAINT cierres_caja_total_cobros_fiado_check CHECK (total_cobros_fiado >= 0);
+
+-- Si la base tenía la diferencia vieja (sin los cobros de fiado) se vuelve a crear con la
+-- fórmula nueva. Es una columna calculada: no se pierde nada, se recalcula para cada cierre.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = current_schema() AND table_name = 'cierres_caja'
+                 AND column_name = 'diferencia'
+                 AND generation_expression NOT LIKE '%total_cobros_fiado%') THEN
+        ALTER TABLE cierres_caja DROP COLUMN diferencia;
+        ALTER TABLE cierres_caja ADD COLUMN diferencia DECIMAL(12, 2)
+            GENERATED ALWAYS AS (efectivo_contado - monto_inicial - total_efectivo - total_cobros_fiado) STORED;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS ventas (
     id SERIAL PRIMARY KEY,
@@ -163,8 +184,16 @@ CREATE TABLE IF NOT EXISTS movimientos_fiado (
     monto DECIMAL(12, 2) NOT NULL CHECK (monto > 0),
     fecha TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     observaciones TEXT,
-    CONSTRAINT movimientos_fiado_venta_check CHECK ((tipo = 'VENTA') = (venta_id IS NOT NULL))
+    cierre_id INT REFERENCES cierres_caja(id),
+    CONSTRAINT movimientos_fiado_venta_check CHECK ((tipo = 'VENTA') = (venta_id IS NOT NULL)),
+    CONSTRAINT movimientos_fiado_cierre_check CHECK (tipo = 'PAGO' OR cierre_id IS NULL)
 );
+
+-- Cada pago queda asociado al cierre de caja del turno en que se cobró (NULL mientras el
+-- turno sigue abierto), igual que las ventas. Las ventas fiadas no: su cierre es el de la venta.
+ALTER TABLE movimientos_fiado ADD COLUMN IF NOT EXISTS cierre_id INT REFERENCES cierres_caja(id);
+ALTER TABLE movimientos_fiado DROP CONSTRAINT IF EXISTS movimientos_fiado_cierre_check;
+ALTER TABLE movimientos_fiado ADD CONSTRAINT movimientos_fiado_cierre_check CHECK (tipo = 'PAGO' OR cierre_id IS NULL);
 
 -- Fechas con zona horaria, igual que los modelos (DateTime(timezone=True)). Si la base
 -- ya existía con TIMESTAMP, convierte las fechas guardadas sin correrlas de hora.
@@ -232,6 +261,7 @@ CREATE INDEX IF NOT EXISTS idx_cierres_caja_usuario_fecha ON cierres_caja (usuar
 CREATE INDEX IF NOT EXISTS idx_cierres_caja_fecha ON cierres_caja (fecha_cierre);
 CREATE INDEX IF NOT EXISTS idx_movimientos_fiado_cliente_fecha ON movimientos_fiado (cliente_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_movimientos_fiado_usuario ON movimientos_fiado (usuario_id);
+CREATE INDEX IF NOT EXISTS idx_movimientos_fiado_cierre ON movimientos_fiado (cierre_id);
 
 -- Seed inicial: cliente "Consumidor Final". Va con id 1 fijo porque el backend y el
 -- POS lo usan como cliente por defecto (cliente_id = 1), y sin fiado.

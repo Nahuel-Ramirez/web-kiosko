@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_URL } from './api';
 
 function getAuthHeaders() {
   const token = localStorage.getItem('web_kiosko_token');
@@ -23,10 +23,12 @@ export function aProductoUI(p) {
     id: p.id,
     code: p.codigo_barras,
     name: p.nombre,
-    cost: Number(p.precio_costo),
+    // Al cajero la API no le manda el precio de costo.
+    cost: p.precio_costo != null ? Number(p.precio_costo) : null,
     price: Number(p.precio_venta),
     stock: p.stock_actual,
     minStock: p.stock_minimo,
+    active: p.activo !== false,
   };
 }
 
@@ -39,12 +41,15 @@ function aProductoAPI(datos) {
   if (datos.price !== undefined) body.precio_venta = Number(datos.price);
   if (datos.stock !== undefined) body.stock_actual = Number(datos.stock);
   if (datos.minStock !== undefined) body.stock_minimo = Number(datos.minStock);
+  if (datos.active !== undefined) body.activo = Boolean(datos.active);
   return body;
 }
 
-export async function listarProductos() {
+/** Por defecto solo los activos; con incluirInactivos (solo ADMIN) también los dados de baja. */
+export async function listarProductos({ incluirInactivos = false } = {}) {
   // El backend pagina con limit=100 por defecto; pedimos más para el inventario completo.
-  const response = await fetch(`${API_URL}/api/productos?limit=1000`, {
+  const extra = incluirInactivos ? '&incluir_inactivos=true' : '';
+  const response = await fetch(`${API_URL}/api/productos?limit=1000${extra}`, {
     headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error(await extraerMensajeError(response, 'Error al obtener productos'));
@@ -114,5 +119,10 @@ export async function eliminarProducto(id) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  if (!response.ok) throw new Error(await extraerMensajeError(response, 'Error al eliminar producto'));
+  if (!response.ok) {
+    // 409 = tiene ventas: la pantalla ofrece darlo de baja en lugar de borrarlo.
+    const error = new Error(await extraerMensajeError(response, 'Error al eliminar producto'));
+    error.status = response.status;
+    throw error;
+  }
 }

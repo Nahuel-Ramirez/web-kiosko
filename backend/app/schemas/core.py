@@ -140,12 +140,16 @@ class ProductoUpdate(BaseModel):
     precio_venta: Optional[Decimal] = Field(default=None, ge=0)
     stock_actual: Optional[int] = Field(default=None, ge=0)
     stock_minimo: Optional[int] = Field(default=None, ge=0)
+    activo: Optional[bool] = None
 
 
 class ProductoOut(ProductoBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    # El cajero no ve el precio de costo: para él la API lo omite (ver routers/productos.py).
+    precio_costo: Optional[Decimal] = None
+    activo: bool = True
 
 
 # ===== VENTAS =====
@@ -223,6 +227,7 @@ class CierreCajaOut(CierreCajaBase):
     usuario_nombre: Optional[str] = None
     # Los cierres anteriores al arqueo no tienen conteo de efectivo (NULL en la base).
     efectivo_contado: Optional[Decimal] = None
+    total_cobros_fiado: Decimal = Decimal('0')
     diferencia: Optional[Decimal] = None
 
 
@@ -247,6 +252,9 @@ class TurnoActualOut(BaseModel):
     total_tarjeta: Decimal
     total_transferencia: Decimal = Decimal('0')
     total_general: Decimal
+    # Pagos de deuda de fiado cobrados en efectivo en este turno (entran en la caja).
+    total_cobros_fiado: Decimal = Decimal('0')
+    cantidad_cobros_fiado: int = 0
     ventas: List[VentaOut] = []
 
 

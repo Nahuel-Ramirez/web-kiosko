@@ -134,6 +134,16 @@ Cada integrante corre la app en su propia PC, con su propia base PostgreSQL. El 
    ```
 4. **Frontend** (desde `frontend/`): `npm install` y `npm run dev` → http://localhost:5173
 
+### Probar desde el celular
+
+Con el celular conectado al mismo WiFi que la PC:
+
+1. Levantar el backend escuchando en la red: `uvicorn app.main:app --reload --host 0.0.0.0`.
+2. `npm run dev` ya muestra la dirección de red (`Network: http://192.168.x.x:5173`). Abrir esa dirección en el celular.
+3. Si no carga, permitir Python y Node en el firewall de Windows (redes privadas).
+
+El frontend busca la API en la misma máquina desde la que se abrió (puerto 8000), y el backend acepta pedidos desde las IP de red local, así que no hay que configurar nada más. No hace falta definir `VITE_API_URL` en el `.env`; si está definida con `localhost`, desde el celular no va a andar.
+
 ### Datos de ejemplo
 
 `python -m app.db.demo` carga datos **ficticios** para mostrar la app:

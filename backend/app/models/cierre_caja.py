@@ -22,7 +22,10 @@ class CierreCaja(Base):
     # Nullable como en init.sql: los cierres anteriores al arqueo no tienen conteo.
     # La obligatoriedad al cerrar la valida CierreCajaCreate / create_cierre.
     efectivo_contado = Column(Numeric(12, 2), nullable=True)
-    # diferencia se calcula en la BD como GENERATED STORED: efectivo_contado - monto_inicial - total_efectivo
+    # Pagos de deuda de fiado cobrados en efectivo durante el turno: también entran en la caja.
+    total_cobros_fiado = Column(Numeric(12, 2), nullable=False, default=0.00)
+    # diferencia se calcula en la BD como GENERATED STORED:
+    # efectivo_contado - monto_inicial - total_efectivo - total_cobros_fiado
     # No incluir en el modelo ORM para evitar conflictos con INSERT (es generated column en PG)
     # Se accede via SQL raw o property en schema si se necesita
 

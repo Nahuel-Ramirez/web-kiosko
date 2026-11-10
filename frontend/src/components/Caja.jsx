@@ -51,6 +51,8 @@ export function Caja() {
     totalTarjeta: 0,
     totalTransferencia: 0,
     totalFiado: 0,
+    totalCobrosFiado: 0,
+    cantidadCobrosFiado: 0,
     cantidad: 0,
     totalGeneral: 0
   });
@@ -151,21 +153,24 @@ export function Caja() {
   }
   const esperandoCuenta = esFiado && clienteFiadoId && !cuentaFiado && !cuentaError;
 
-  const { totalEfectivo, totalTarjeta, totalTransferencia, totalFiado, cantidad, totalGeneral } = turnoTotales;
+  const {
+    totalEfectivo, totalTarjeta, totalTransferencia, totalFiado, totalCobrosFiado, cantidadCobrosFiado, cantidad, totalGeneral
+  } = turnoTotales;
+  const turnoVacio = cantidad === 0 && !cantidadCobrosFiado;
 
-  // Efectivo que debería haber en caja según el servidor más el monto inicial cargado.
-  const efectivoEsperado = Number(montoInicial || 0) + totalEfectivo;
+  // Efectivo que debería haber en caja: monto inicial + ventas en efectivo + cobros de deudas de fiado.
+  const efectivoEsperado = Number(montoInicial || 0) + totalEfectivo + (totalCobrosFiado || 0);
 
   const handleCierre = async () => {
-    if (cantidad === 0) {
-      setCierreError('No hay ventas en este turno para cerrar');
+    if (turnoVacio) {
+      setCierreError('No hay ventas ni cobros de fiado en este turno para cerrar');
       return;
     }
     if (efectivoContado === '' || Number(efectivoContado) < 0 || Number(montoInicial || 0) < 0) {
       setCierreError('Para cerrar la caja ingresá el efectivo contado (y el monto inicial, si hubo).');
       return;
     }
-    if (!window.confirm(`¿Cerrar caja?\nEfectivo: ${formatMoney(totalEfectivo)}\nTarjeta: ${formatMoney(totalTarjeta)}\nTransferencia: ${formatMoney(totalTransferencia)}\nFiado (no entra en caja): ${formatMoney(totalFiado)}\nVentas: ${cantidad}\nTotal: ${formatMoney(totalGeneral)}\n\nMonto inicial: ${formatMoney(Number(montoInicial || 0))}\nEfectivo contado: ${formatMoney(Number(efectivoContado))}`)) {
+    if (!window.confirm(`¿Cerrar caja?\nEfectivo: ${formatMoney(totalEfectivo)}\nTarjeta: ${formatMoney(totalTarjeta)}\nTransferencia: ${formatMoney(totalTransferencia)}\nFiado (no entra en caja): ${formatMoney(totalFiado)}\nCobros de fiado (efectivo): ${formatMoney(totalCobrosFiado || 0)}\nVentas: ${cantidad}\nTotal: ${formatMoney(totalGeneral)}\n\nMonto inicial: ${formatMoney(Number(montoInicial || 0))}\nEfectivo contado: ${formatMoney(Number(efectivoContado))}`)) {
       return;
     }
     setCierreLoading(true);
@@ -260,8 +265,8 @@ export function Caja() {
                     </div>
                     <div className="price">{formatMoney(product.price)}</div>
                     <div className="action-row">
-                      <span className={getStockTagClass(product.stock)}>
-                        {getStockStatus(product.stock).label}
+                      <span className={getStockTagClass(product.stock, product.minStock)}>
+                        {getStockStatus(product.stock, product.minStock).label}
                       </span>
                       <button
                         data-add-product={product.id}
@@ -434,6 +439,12 @@ export function Caja() {
                     <strong>{formatMoney(totalFiado)}</strong>
                   </div>
                 )}
+                {cantidadCobrosFiado > 0 && (
+                  <div className="cierre-row">
+                    <span>Cobros de fiado en efectivo ({cantidadCobrosFiado})</span>
+                    <strong>{formatMoney(totalCobrosFiado)}</strong>
+                  </div>
+                )}
                 <div className="cierre-row total">
                   <span>Total</span>
                   <strong>{formatMoney(totalGeneral)}</strong>
@@ -482,7 +493,7 @@ export function Caja() {
               <button
                 className="primary-btn full cierre-btn"
                 onClick={handleCierre}
-                disabled={cantidad === 0 || cierreLoading || efectivoContado === ''}
+                disabled={turnoVacio || cierreLoading || efectivoContado === ''}
               >
                 {cierreLoading ? 'Cerrando...' : 'Cerrar caja'}
               </button>

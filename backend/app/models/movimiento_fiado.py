@@ -14,6 +14,8 @@ class MovimientoFiado(Base):
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     venta_id = Column(Integer, ForeignKey("ventas.id", ondelete="CASCADE"), unique=True, nullable=True)
+    # Solo en los PAGO: cierre de caja del turno en que se cobró (NULL mientras el turno sigue abierto).
+    cierre_id = Column(Integer, ForeignKey("cierres_caja.id"), nullable=True)
     tipo = Column(String(10), nullable=False)
     monto = Column(Numeric(12, 2), nullable=False)
     fecha = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

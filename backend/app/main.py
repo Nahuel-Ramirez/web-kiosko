@@ -10,8 +10,8 @@ from app.services.core_service import ReglaNegocioError
 app = FastAPI(title="Web Kiosko API")
 
 # Permite que el frontend (Vite, corriendo en otro puerto) llame a esta API
-# desde el navegador. Agregar acá cualquier otro origen (ej: IP de red local
-# para probar desde el celular) si hace falta.
+# desde el navegador. La regex acepta además las IP de red local (192.168.x.x,
+# 10.x.x.x, 172.16-31.x.x) para probar la app desde un celular en la misma red.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -20,6 +20,7 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5174",
     ],
+    allow_origin_regex=r"http://(192\.168|10\.\d{1,3}|172\.(1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}:517\d",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

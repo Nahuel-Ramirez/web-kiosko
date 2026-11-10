@@ -365,7 +365,7 @@ def test_venta_fiada_suma_deuda_y_no_entra_en_caja(client, cajero_h, admin_h, pr
 def test_fiado_rechaza_consumidor_final_limite_e_inactivo(client, cajero_h, admin_h, producto):
     assert client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, "FIADO")).status_code == 400
 
-    c = _cliente_fiado(client, cajero_h, limite=300)
+    c = _cliente_fiado(client, admin_h, limite=300)  # el límite lo fija el administrador
     assert client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, "FIADO", c["id"])).status_code == 201
     assert client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, "FIADO", c["id"])).status_code == 409
 
@@ -396,7 +396,62 @@ def test_pagos_de_fiado_y_deudores(client, cajero_h, admin_h, producto):
     assert client.post(url, headers=cajero_h, json={"monto": 260}).status_code == 201
     assert client.get("/api/fiados/deudores", headers=admin_h).json() == []
     assert client.post("/api/clientes/999/pagos", headers=cajero_h, json={"monto": 1}).status_code == 404
-    # por ahora los pagos de deuda no entran en la caja del turno
-    assert float(client.get("/api/turnos/turno-actual", headers=cajero_h).json()["total_efectivo"]) == 0
+    # los pagos no son ventas: van aparte, como cobros de fiado del turno
+    turno = client.get("/api/turnos/turno-actual", headers=cajero_h).json()
+    assert float(turno["total_efectivo"]) == 0 and float(turno["total_cobros_fiado"]) == 360
+
+
+def test_cobros_de_fiado_entran_en_el_cierre(client, cajero_h, producto):
+    c = _cliente_fiado(client, cajero_h)
+    client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 2, "FIADO", c["id"]))
+    client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1, "EFECTIVO"))
+    client.post("/api/clientes/%s/pagos" % c["id"], headers=cajero_h, json={"monto": 100})
+    turno = client.get("/api/turnos/turno-actual", headers=cajero_h).json()
+    assert (turno["cantidad_cobros_fiado"], float(turno["total_cobros_fiado"])) == (1, 100)
+
+    # fondo 500 + venta en efectivo 180 + cobro de fiado 100 = 780 en la caja
+    cierre = client.post("/api/turnos/cierre", headers=cajero_h, json={"monto_inicial": 500, "efectivo_contado": 780}).json()
+    assert float(cierre["total_cobros_fiado"]) == 100 and float(cierre["diferencia"]) == 0
+    assert client.get("/api/turnos/turno-actual", headers=cajero_h).json()["cantidad_cobros_fiado"] == 0
+    # un pago despues del cierre queda para el turno siguiente
+    client.post("/api/clientes/%s/pagos" % c["id"], headers=cajero_h, json={"monto": 50})
+    assert float(client.get("/api/turnos/turno-actual", headers=cajero_h).json()["total_cobros_fiado"]) == 50
+
+
+def test_solo_el_admin_fija_el_limite_de_fiado(client, cajero_h, admin_h):
+    r = client.post("/api/clientes", headers=cajero_h, json={"dni_cuit": "31222333", "razon_social": "X", "limite_fiado": 999999})
+    assert r.status_code == 403
+    r = client.post("/api/clientes", headers=cajero_h, json={"dni_cuit": "31222333", "razon_social": "X"})
+    assert r.status_code == 201 and float(r.json()["limite_fiado"]) == 10000
+    r = client.post("/api/clientes", headers=admin_h, json={"dni_cuit": "31222334", "razon_social": "Y", "limite_fiado": 500})
+    assert r.status_code == 201 and float(r.json()["limite_fiado"]) == 500
+
+
+# ---------- productos: costo y baja logica ----------
+def test_el_cajero_no_recibe_el_precio_de_costo(client, cajero_h, admin_h, producto):
+    for url in ("/api/productos", "/api/productos/%s" % producto["id"], "/api/productos/codigo/7790001"):
+        de_cajero = client.get(url, headers=cajero_h).json()
+        de_admin = client.get(url, headers=admin_h).json()
+        de_cajero = de_cajero[0] if isinstance(de_cajero, list) else de_cajero
+        de_admin = de_admin[0] if isinstance(de_admin, list) else de_admin
+        assert "precio_costo" not in de_cajero, url
+        assert float(de_admin["precio_costo"]) == 100, url
+
+
+def test_baja_logica_de_producto(client, cajero_h, admin_h, producto):
+    pid = producto["id"]
+    client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1))
+    assert client.delete("/api/productos/%s" % pid, headers=admin_h).status_code == 409
+    assert client.put("/api/productos/%s" % pid, headers=admin_h, json={"activo": False}).json()["activo"] is False
+
+    assert client.get("/api/productos", headers=cajero_h).json() == []
+    assert client.get("/api/productos?incluir_inactivos=true", headers=cajero_h).json() == []  # solo ADMIN
+    assert [p["id"] for p in client.get("/api/productos?incluir_inactivos=true", headers=admin_h).json()] == [pid]
+    assert client.get("/api/productos/codigo/7790001", headers=cajero_h).status_code == 404
+    r = client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1))
+    assert r.status_code == 400 and "baja" in r.json()["detail"]
+
+    client.put("/api/productos/%s" % pid, headers=admin_h, json={"activo": True})
+    assert client.post("/api/turnos/ventas", headers=cajero_h, json=venta_payload(producto, 1)).status_code == 201
 
 

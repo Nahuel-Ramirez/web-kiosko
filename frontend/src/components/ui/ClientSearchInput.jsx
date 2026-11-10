@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { crearCliente } from '../../services/clienteService';
+import { API_URL } from '../../services/api';
 
 const ALTA_VACIA = { tipo: 'persona', nombre: '', apellido: '', razon_social: '', dni_cuit: '', email: '', domicilio: '', telefono: '' };
 
@@ -46,7 +47,7 @@ export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por 
     debouncedSearch.current = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ dni: dni.trim() });
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/clientes/buscar?${params}`, {
+        const response = await fetch(`${API_URL}/api/clientes/buscar?${params}`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('web_kiosko_token')}`,
           },

@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { getStockStatus, getStockBadgeClass } from '../utils/stock';
+import { listarProductos } from '../services/productosService';
 import { ProductSearchInput, useProductFilter } from './ui/ProductSearchInput';
+
+const FORM_VACIO = { name: '', code: '', cost: '', price: '', stock: '', minStock: '5' };
 
 export function Admin() {
   const {
@@ -20,19 +23,28 @@ export function Admin() {
 
   const filteredProducts = useProductFilter(products, searchTerm);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    code: '',
-    cost: '',
-    price: '',
-    stock: ''
-  });
+  const [formData, setFormData] = useState(FORM_VACIO);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
   // Id del producto con una operación en curso (stock o baja), para deshabilitar sus botones.
   const [busyId, setBusyId] = useState(null);
+  // Productos dados de baja (baja lógica): no aparecen en la Caja, se pueden reactivar.
+  const [inactivos, setInactivos] = useState([]);
+
+  const cargarInactivos = useCallback(async () => {
+    try {
+      const todos = await listarProductos({ incluirInactivos: true });
+      setInactivos(todos.filter(product => !product.active));
+    } catch {
+      setInactivos([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarInactivos();
+  }, [cargarInactivos]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -48,7 +60,8 @@ export function Admin() {
       code: product.code,
       cost: product.cost,
       price: product.price,
-      stock: product.stock
+      stock: product.stock,
+      minStock: product.minStock
     });
     setError('');
     setSuccess('');
@@ -57,7 +70,7 @@ export function Admin() {
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setFormData({ name: '', code: '', cost: '', price: '', stock: '' });
+    setFormData(FORM_VACIO);
     setError('');
     setSuccess('');
   };
@@ -67,8 +80,8 @@ export function Admin() {
     setError('');
     setSuccess('');
 
-    const { name, code, cost, price, stock } = formData;
-    if (!name.trim() || !code.trim() || !cost || !price || !stock) {
+    const { name, code, cost, price, stock, minStock } = formData;
+    if (!name.trim() || !code.trim() || cost === '' || price === '' || stock === '' || minStock === '') {
       setError('Complete todos los campos obligatorios.');
       return;
     }
@@ -84,7 +97,8 @@ export function Admin() {
       code: code.trim(),
       cost: Number(cost),
       price: Number(price),
-      stock: Number(stock)
+      stock: Number(stock),
+      minStock: Number(minStock)
     };
 
     setSaving(true);
@@ -97,7 +111,7 @@ export function Admin() {
         setSuccess('Producto agregado correctamente.');
       }
       setEditingId(null);
-      setFormData({ name: '', code: '', cost: '', price: '', stock: '' });
+      setFormData(FORM_VACIO);
     } catch (err) {
       setError(err.message || 'No se pudo guardar el producto.');
     } finally {
@@ -128,11 +142,36 @@ export function Admin() {
       if (editingId === product.id) handleCancelEdit();
       setSuccess(`Producto "${product.name}" eliminado.`);
     } catch (err) {
-      // Si el producto tiene ventas el backend responde 409 con el motivo.
-      setError(err.message || 'No se pudo eliminar el producto.');
+      // Si el producto tiene ventas el backend responde 409: no se borra, pero se puede dar de baja.
+      if (err.status === 409 && window.confirm(
+        `"${product.name}" tiene ventas registradas y no se puede eliminar.\n¿Darlo de baja? Deja de aparecer en la Caja y se puede reactivar.`
+      )) {
+        await cambiarActivo(product, false);
+      } else {
+        setError(err.message || 'No se pudo eliminar el producto.');
+      }
     } finally {
       setBusyId(null);
     }
+  };
+
+  const cambiarActivo = async (product, activo) => {
+    try {
+      await updateProduct(product.id, { active: activo });
+      if (editingId === product.id) handleCancelEdit();
+      await Promise.all([loadProducts(), cargarInactivos()]);
+      setSuccess(activo ? `"${product.name}" volvió a estar a la venta.` : `"${product.name}" quedó dado de baja.`);
+    } catch (err) {
+      setError(err.message || 'No se pudo cambiar el estado del producto.');
+    }
+  };
+
+  const handleReactivar = async (product) => {
+    setError('');
+    setSuccess('');
+    setBusyId(product.id);
+    await cambiarActivo(product, true);
+    setBusyId(null);
   };
 
   return (
@@ -206,19 +245,35 @@ export function Admin() {
               </div>
             </div>
 
-            <div className="form-field">
-              <label htmlFor="prodStock">Stock <span className="required">*</span></label>
-              <input
-                type="number"
-                id="prodStock"
-                name="stock"
-                min="0"
-                step="1"
-                value={formData.stock}
-                onChange={handleChange}
-                placeholder="0"
-                required
-              />
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="prodStock">Stock <span className="required">*</span></label>
+                <input
+                  type="number"
+                  id="prodStock"
+                  name="stock"
+                  min="0"
+                  step="1"
+                  value={formData.stock}
+                  onChange={handleChange}
+                  placeholder="0"
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label htmlFor="prodMinStock">Stock mínimo (alerta) <span className="required">*</span></label>
+                <input
+                  type="number"
+                  id="prodMinStock"
+                  name="minStock"
+                  min="0"
+                  step="1"
+                  value={formData.minStock}
+                  onChange={handleChange}
+                  placeholder="5"
+                  required
+                />
+              </div>
             </div>
 
             <div className="form-actions">
@@ -232,6 +287,29 @@ export function Admin() {
               )}
             </div>
           </form>
+
+          {inactivos.length > 0 && (
+            <div className="productos-inactivos">
+              <h4>Dados de baja ({inactivos.length})</h4>
+              <ul>
+                {inactivos.map(product => (
+                  <li key={product.id}>
+                    <div>
+                      <strong>{product.name}</strong>
+                      <small><code>{product.code}</code></small>
+                    </div>
+                    <button
+                      className="mini-btn edit-btn"
+                      onClick={() => handleReactivar(product)}
+                      disabled={busyId === product.id}
+                    >
+                      Reactivar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="card">
@@ -266,7 +344,7 @@ export function Admin() {
               </thead>
               <tbody>
                 {filteredProducts.map(product => (
-                  <tr key={product.id} className={product.stock <= 5 ? 'low-stock' : ''}>
+                  <tr key={product.id} className={product.stock <= product.minStock ? 'low-stock' : ''}>
                     <td>
                       <strong>{product.name}</strong>
                     </td>
@@ -291,8 +369,8 @@ export function Admin() {
                       </div>
                     </td>
                     <td>
-                      <span className={getStockBadgeClass(product.stock)}>
-                        {getStockStatus(product.stock).label}
+                      <span className={getStockBadgeClass(product.stock, product.minStock)}>
+                        {getStockStatus(product.stock, product.minStock).label}
                       </span>
                     </td>
                     <td>

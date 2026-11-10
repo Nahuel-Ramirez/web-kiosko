@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
+import { API_URL } from '../services/api';
 
 const USUARIOS_DEMO = {
   admin: { username: 'admin', password: 'admin123' },
@@ -57,7 +58,6 @@ export function Login() {
 
     setResetLoading(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
       const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

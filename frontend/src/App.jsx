@@ -109,8 +109,8 @@ function AppContent() {
                             <strong>{item.name}</strong>
                             <small>Stock: {item.stock}</small>
                           </div>
-                          <span className={`stock-tag ${getStockTagClass(item.stock)}`}>
-                            {getStockStatus(item.stock).label}
+                          <span className={`stock-tag ${getStockTagClass(item.stock, item.minStock)}`}>
+                            {getStockStatus(item.stock, item.minStock).label}
                           </span>
                         </li>
                       ))}
