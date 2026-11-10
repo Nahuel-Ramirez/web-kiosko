@@ -36,7 +36,7 @@ def seed() -> None:
             )
         if not db.query(Cliente).filter(Cliente.dni_cuit == "0").first():
             # id=1 por ser el primero; el POS usa cliente_id=1 como Consumidor Final
-            db.add(Cliente(dni_cuit="0", razon_social="Consumidor Final"))
+            db.add(Cliente(dni_cuit="0", razon_social="Consumidor Final", limite_fiado=0))
         db.commit()
         print("Seed completado (admin/admin123, cajero/cajero123, cliente Consumidor Final).")
     finally:

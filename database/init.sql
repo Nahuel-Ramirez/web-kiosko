@@ -46,8 +46,33 @@ CREATE TABLE IF NOT EXISTS clientes (
     dni_cuit VARCHAR(20) UNIQUE NOT NULL,
     razon_social VARCHAR(150) NOT NULL,
     domicilio VARCHAR(200),
-    telefono VARCHAR(50)
+    telefono VARCHAR(50),
+    nombre VARCHAR(80),
+    apellido VARCHAR(80),
+    email VARCHAR(120),
+    limite_fiado DECIMAL(12, 2) NOT NULL DEFAULT 10000.00 CHECK (limite_fiado >= 0),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_alta TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT clientes_consumidor_final_fiado_check CHECK (id <> 1 OR limite_fiado = 0)
 );
+
+-- Fiado: datos de la persona, tope de deuda y baja lógica. razon_social sigue siendo el
+-- nombre a mostrar: para una persona el backend la arma con "Apellido Nombre" y para un
+-- comercio con CUIT se carga directo. Si la base ya existía, agrega las columnas.
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nombre VARCHAR(80);
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apellido VARCHAR(80);
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email VARCHAR(120);
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS limite_fiado DECIMAL(12, 2) NOT NULL DEFAULT 10000.00;
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_alta TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE clientes DROP CONSTRAINT IF EXISTS clientes_limite_fiado_check;
+ALTER TABLE clientes ADD CONSTRAINT clientes_limite_fiado_check CHECK (limite_fiado >= 0);
+
+-- A Consumidor Final (id 1) no se le fía: su límite queda en 0.
+UPDATE clientes SET limite_fiado = 0 WHERE id = 1 AND limite_fiado <> 0;
+ALTER TABLE clientes DROP CONSTRAINT IF EXISTS clientes_consumidor_final_fiado_check;
+ALTER TABLE clientes ADD CONSTRAINT clientes_consumidor_final_fiado_check
+    CHECK (id <> 1 OR limite_fiado = 0);
 
 CREATE TABLE IF NOT EXISTS cierres_caja (
     id SERIAL PRIMARY KEY,
@@ -85,16 +110,23 @@ CREATE TABLE IF NOT EXISTS ventas (
     cierre_id INT REFERENCES cierres_caja(id),
     fecha TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     total DECIMAL(12, 2) NOT NULL CHECK (total >= 0),
-    metodo_pago VARCHAR(20) NOT NULL CHECK (metodo_pago IN ('EFECTIVO', 'TARJETA', 'TRANSFERENCIA')),
+    metodo_pago VARCHAR(20) NOT NULL CHECK (metodo_pago IN ('EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'FIADO')),
     monto_recibido DECIMAL(12, 2),
-    vuelto DECIMAL(12, 2)
+    vuelto DECIMAL(12, 2),
+    CONSTRAINT ventas_fiado_check
+        CHECK (metodo_pago <> 'FIADO' OR (cliente_id <> 1 AND monto_recibido IS NULL AND vuelto IS NULL))
 );
 
--- HU-20: si la base ya existía, reemplaza el CHECK viejo (solo EFECTIVO/TARJETA).
+-- HU-20 y fiado: si la base ya existía, reemplaza el CHECK viejo por uno con los cuatro medios.
 -- ventas_metodo_pago_check es el nombre que PostgreSQL le asigna al CHECK de la columna.
 ALTER TABLE ventas DROP CONSTRAINT IF EXISTS ventas_metodo_pago_check;
 ALTER TABLE ventas ADD CONSTRAINT ventas_metodo_pago_check
-    CHECK (metodo_pago IN ('EFECTIVO', 'TARJETA', 'TRANSFERENCIA'));
+    CHECK (metodo_pago IN ('EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'FIADO'));
+
+-- Una venta fiada no puede ser a Consumidor Final y no tiene pago en el momento.
+ALTER TABLE ventas DROP CONSTRAINT IF EXISTS ventas_fiado_check;
+ALTER TABLE ventas ADD CONSTRAINT ventas_fiado_check
+    CHECK (metodo_pago <> 'FIADO' OR (cliente_id <> 1 AND monto_recibido IS NULL AND vuelto IS NULL));
 
 ALTER TABLE ventas DROP CONSTRAINT IF EXISTS ventas_total_check;
 ALTER TABLE ventas ADD CONSTRAINT ventas_total_check CHECK (total >= 0);
@@ -118,6 +150,21 @@ ALTER TABLE detalle_ventas ADD CONSTRAINT detalle_ventas_subtotal_check CHECK (s
 ALTER TABLE detalle_ventas DROP CONSTRAINT IF EXISTS detalle_ventas_descuento_check;
 ALTER TABLE detalle_ventas ADD CONSTRAINT detalle_ventas_descuento_check
     CHECK (subtotal <= cantidad * precio_unitario);
+
+-- Cuenta corriente del fiado: cada venta fiada suma deuda (VENTA) y cada pago la baja (PAGO).
+-- El saldo no se guarda en clientes, se calcula desde acá (vista_saldos_fiado), así nunca
+-- se desincroniza. Un movimiento VENTA siempre apunta a su venta y un PAGO nunca.
+CREATE TABLE IF NOT EXISTS movimientos_fiado (
+    id SERIAL PRIMARY KEY,
+    cliente_id INT NOT NULL REFERENCES clientes(id),
+    usuario_id INT NOT NULL REFERENCES usuarios(id),
+    venta_id INT UNIQUE REFERENCES ventas(id) ON DELETE CASCADE,
+    tipo VARCHAR(10) NOT NULL CHECK (tipo IN ('VENTA', 'PAGO')),
+    monto DECIMAL(12, 2) NOT NULL CHECK (monto > 0),
+    fecha TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    observaciones TEXT,
+    CONSTRAINT movimientos_fiado_venta_check CHECK ((tipo = 'VENTA') = (venta_id IS NOT NULL))
+);
 
 -- Fechas con zona horaria, igual que los modelos (DateTime(timezone=True)). Si la base
 -- ya existía con TIMESTAMP, convierte las fechas guardadas sin correrlas de hora.
@@ -158,6 +205,21 @@ FROM ventas v
 JOIN detalle_ventas d ON d.venta_id = v.id
 GROUP BY v.id;
 
+-- Saldo de fiado de cada cliente: ventas fiadas menos pagos. disponible es cuánto más se
+-- le puede fiar antes de llegar a su límite.
+CREATE OR REPLACE VIEW vista_saldos_fiado AS
+SELECT c.id AS cliente_id,
+       c.razon_social,
+       c.dni_cuit,
+       c.activo,
+       c.limite_fiado,
+       COALESCE(SUM(CASE WHEN m.tipo = 'VENTA' THEN m.monto ELSE -m.monto END), 0) AS saldo,
+       c.limite_fiado - COALESCE(SUM(CASE WHEN m.tipo = 'VENTA' THEN m.monto ELSE -m.monto END), 0) AS disponible,
+       MAX(m.fecha) AS ultimo_movimiento
+FROM clientes c
+LEFT JOIN movimientos_fiado m ON m.cliente_id = c.id
+GROUP BY c.id;
+
 -- Índices para las consultas de turnos y reportes (PostgreSQL no indexa solo las
 -- claves foráneas).
 CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON ventas (fecha);
@@ -168,11 +230,13 @@ CREATE INDEX IF NOT EXISTS idx_detalle_ventas_venta ON detalle_ventas (venta_id)
 CREATE INDEX IF NOT EXISTS idx_detalle_ventas_producto ON detalle_ventas (producto_id);
 CREATE INDEX IF NOT EXISTS idx_cierres_caja_usuario_fecha ON cierres_caja (usuario_id, fecha_cierre);
 CREATE INDEX IF NOT EXISTS idx_cierres_caja_fecha ON cierres_caja (fecha_cierre);
+CREATE INDEX IF NOT EXISTS idx_movimientos_fiado_cliente_fecha ON movimientos_fiado (cliente_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_movimientos_fiado_usuario ON movimientos_fiado (usuario_id);
 
 -- Seed inicial: cliente "Consumidor Final". Va con id 1 fijo porque el backend y el
--- POS lo usan como cliente por defecto (cliente_id = 1).
-INSERT INTO clientes (id, dni_cuit, razon_social)
-VALUES (1, '0', 'Consumidor Final')
+-- POS lo usan como cliente por defecto (cliente_id = 1), y sin fiado.
+INSERT INTO clientes (id, dni_cuit, razon_social, limite_fiado)
+VALUES (1, '0', 'Consumidor Final', 0)
 ON CONFLICT DO NOTHING;
 
 -- Como el id se cargó a mano, acomoda la secuencia para que el próximo cliente no choque.
