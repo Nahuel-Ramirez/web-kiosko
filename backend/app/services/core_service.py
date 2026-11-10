@@ -108,7 +108,9 @@ def get_cliente_by_dni(db: Session, dni_cuit: str) -> Optional[Cliente]:
 def buscar_clientes(db: Session, termino: str, limite: int = 10) -> List[Cliente]:
     """Busca por DNI/CUIT (prefijo) o por razon social (contiene)."""
     termino = termino.strip()
-    like_doc = termino + "%"
+    # Los documentos se guardan sin puntos ni guiones: "20-1234" tambien encuentra "201234...".
+    doc = termino.replace(".", "").replace("-", "").replace(" ", "")
+    like_doc = (doc if doc.isdigit() else termino) + "%"
     like_nombre = "%" + termino + "%"
     return (
         db.query(Cliente)

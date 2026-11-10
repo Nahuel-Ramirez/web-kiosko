@@ -183,6 +183,7 @@ export function Clientes() {
                   value={formData.dni_cuit}
                   onChange={handleChange}
                   placeholder="Ej: 20123456789"
+                  inputMode="numeric"
                   required
                 />
               </div>
