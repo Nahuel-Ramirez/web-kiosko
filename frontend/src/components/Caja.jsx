@@ -7,6 +7,9 @@ import { BarcodeInput } from './ui/BarcodeInput';
 import { ProductSearchInput } from './ui/ProductSearchInput';
 import { ClienteSelectorModal } from './ui/ClienteSelectorModal';
 import { buscarProductoPorCodigo } from '../services/productosService';
+import { obtenerCuentaFiado } from '../services/fiadoService';
+
+const CONSUMIDOR_FINAL_ID = 1;
 
 export function Caja() {
   const { currentUser } = useAuth();
@@ -30,7 +33,8 @@ export function Caja() {
     cancelSale,
     updateCashReceived,
     getTotalesDelTurno,
-    crearCierre
+    crearCierre,
+    cargarDeudores
   } = useApp();
 
   const [cierreLoading, setCierreLoading] = useState(false);
@@ -46,6 +50,7 @@ export function Caja() {
     totalEfectivo: 0,
     totalTarjeta: 0,
     totalTransferencia: 0,
+    totalFiado: 0,
     cantidad: 0,
     totalGeneral: 0
   });
@@ -54,6 +59,27 @@ export function Caja() {
   const [cobrando, setCobrando] = useState(false);
   const [ventaError, setVentaError] = useState('');
   const [scanMensaje, setScanMensaje] = useState('');
+  const [cuentaFiado, setCuentaFiado] = useState(null);
+  const [cuentaError, setCuentaError] = useState('');
+
+  const esFiado = paymentMethod === 'Fiado';
+  const clienteFiadoId = clienteSeleccionado && clienteSeleccionado.id !== CONSUMIDOR_FINAL_ID
+    ? clienteSeleccionado.id
+    : null;
+
+  // Con "Fiado" se trae lo que debe el cliente para avisar antes de cobrar si se pasa del límite.
+  useEffect(() => {
+    if (!esFiado || !clienteFiadoId) {
+      setCuentaFiado(null);
+      setCuentaError('');
+      return undefined;
+    }
+    let vigente = true;
+    obtenerCuentaFiado(clienteFiadoId)
+      .then(cuenta => { if (vigente) { setCuentaFiado(cuenta); setCuentaError(''); } })
+      .catch(err => { if (vigente) { setCuentaFiado(null); setCuentaError(err.message); } });
+    return () => { vigente = false; };
+  }, [esFiado, clienteFiadoId]);
 
   const cargarTotalesTurno = async () => {
     try {
@@ -113,7 +139,19 @@ export function Caja() {
   const received = Number(cashReceived || 0);
   const change = Math.max(received - total, 0);
 
-  const { totalEfectivo, totalTarjeta, totalTransferencia, cantidad, totalGeneral } = turnoTotales;
+  let fiadoBloqueo = '';
+  if (esFiado && !clienteFiadoId) {
+    fiadoBloqueo = 'Para fiar elegí un cliente: a Consumidor Final no se le fía.';
+  } else if (esFiado && cuentaError) {
+    fiadoBloqueo = cuentaError;
+  } else if (esFiado && cuentaFiado && !cuentaFiado.activo) {
+    fiadoBloqueo = 'El cliente está dado de baja y no puede llevar fiado.';
+  } else if (esFiado && cuentaFiado && total > Number(cuentaFiado.disponible)) {
+    fiadoBloqueo = `Supera el límite de fiado: le quedan ${formatMoney(Number(cuentaFiado.disponible))} disponibles y la venta es de ${formatMoney(total)}.`;
+  }
+  const esperandoCuenta = esFiado && clienteFiadoId && !cuentaFiado && !cuentaError;
+
+  const { totalEfectivo, totalTarjeta, totalTransferencia, totalFiado, cantidad, totalGeneral } = turnoTotales;
 
   // Efectivo que debería haber en caja según el servidor más el monto inicial cargado.
   const efectivoEsperado = Number(montoInicial || 0) + totalEfectivo;
@@ -127,7 +165,7 @@ export function Caja() {
       setCierreError('Para cerrar la caja ingresá el efectivo contado (y el monto inicial, si hubo).');
       return;
     }
-    if (!window.confirm(`¿Cerrar caja?\nEfectivo: ${formatMoney(totalEfectivo)}\nTarjeta: ${formatMoney(totalTarjeta)}\nTransferencia: ${formatMoney(totalTransferencia)}\nVentas: ${cantidad}\nTotal: ${formatMoney(totalGeneral)}\n\nMonto inicial: ${formatMoney(Number(montoInicial || 0))}\nEfectivo contado: ${formatMoney(Number(efectivoContado))}`)) {
+    if (!window.confirm(`¿Cerrar caja?\nEfectivo: ${formatMoney(totalEfectivo)}\nTarjeta: ${formatMoney(totalTarjeta)}\nTransferencia: ${formatMoney(totalTransferencia)}\nFiado (no entra en caja): ${formatMoney(totalFiado)}\nVentas: ${cantidad}\nTotal: ${formatMoney(totalGeneral)}\n\nMonto inicial: ${formatMoney(Number(montoInicial || 0))}\nEfectivo contado: ${formatMoney(Number(efectivoContado))}`)) {
       return;
     }
     setCierreLoading(true);
@@ -149,7 +187,7 @@ export function Caja() {
   };
 
   const handleCheckoutWithTicket = async () => {
-    if (!cart.length || cobrando) return;
+    if (!cart.length || cobrando || fiadoBloqueo || esperandoCuenta) return;
     setVentaError('');
     setCobrando(true);
 
@@ -173,6 +211,7 @@ export function Caja() {
       setShowTicket(true);
       setClienteSeleccionado(null);
       cargarTotalesTurno();
+      if (venta.metodo_pago === 'FIADO') cargarDeudores();
     } catch (err) {
       // 409 (sin stock) o 400: se muestra el motivo y el carrito queda como estaba.
       setVentaError(err.message || 'No se pudo registrar la venta.');
@@ -310,33 +349,61 @@ export function Caja() {
                   <option value="Efectivo">Efectivo</option>
                   <option value="Tarjeta">Tarjeta</option>
                   <option value="Transferencia">Transferencia</option>
+                  <option value="Fiado">Fiado</option>
                 </select>
               </label>
-              <label>
-                Monto recibido
-                <input
-                  id="cashReceived"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0"
-                  value={paymentMethod === 'Efectivo' ? cashReceived : ''}
-                  onChange={(e) => updateCashReceived(e.target.value)}
-                  disabled={paymentMethod !== 'Efectivo'}
-                />
-              </label>
-              <div className="change-box">
-                <span>Vuelto</span>
-                <strong>{formatMoney(change)}</strong>
-              </div>
+              {esFiado ? (
+                cuentaFiado && (
+                  <div className="fiado-box">
+                    <div className="cierre-row">
+                      <span>{cuentaFiado.razon_social} debe</span>
+                      <strong>{formatMoney(Number(cuentaFiado.saldo))}</strong>
+                    </div>
+                    <div className="cierre-row">
+                      <span>Límite de fiado</span>
+                      <strong>{formatMoney(Number(cuentaFiado.limite_fiado))}</strong>
+                    </div>
+                    <div className="cierre-row total">
+                      <span>Disponible</span>
+                      <strong>{formatMoney(Number(cuentaFiado.disponible))}</strong>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <>
+                  <label>
+                    Monto recibido
+                    <input
+                      id="cashReceived"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0"
+                      value={paymentMethod === 'Efectivo' ? cashReceived : ''}
+                      onChange={(e) => updateCashReceived(e.target.value)}
+                      disabled={paymentMethod !== 'Efectivo'}
+                    />
+                  </label>
+                  <div className="change-box">
+                    <span>Vuelto</span>
+                    <strong>{formatMoney(change)}</strong>
+                  </div>
+                </>
+              )}
             </div>
 
+            {fiadoBloqueo && <div className="form-message error">{fiadoBloqueo}</div>}
             {ventaError && <div className="form-message error">{ventaError}</div>}
 
             <div className="cart-actions">
               <button id="cancelSaleBtn" className="secondary-btn full" onClick={() => { cancelSale(); setVentaError(''); }} disabled={cobrando}>Cancelar</button>
-              <button id="checkoutBtn" className="primary-btn full" onClick={handleCheckoutWithTicket} disabled={cart.length === 0 || cobrando}>
-                {cobrando ? 'Cobrando...' : 'Cobrar'}
+              <button
+                id="checkoutBtn"
+                className="primary-btn full"
+                onClick={handleCheckoutWithTicket}
+                disabled={cart.length === 0 || cobrando || Boolean(fiadoBloqueo) || Boolean(esperandoCuenta)}
+              >
+                {cobrando ? 'Registrando...' : esFiado ? 'Anotar fiado' : 'Cobrar'}
               </button>
             </div>
 
@@ -361,6 +428,12 @@ export function Caja() {
                   <span>Transferencia</span>
                   <strong>{formatMoney(totalTransferencia)}</strong>
                 </div>
+                {totalFiado > 0 && (
+                  <div className="cierre-row">
+                    <span>Fiado (no entra en caja)</span>
+                    <strong>{formatMoney(totalFiado)}</strong>
+                  </div>
+                )}
                 <div className="cierre-row total">
                   <span>Total</span>
                   <strong>{formatMoney(totalGeneral)}</strong>

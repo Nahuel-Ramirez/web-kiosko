@@ -170,6 +170,13 @@ input, select {
   transform: translateY(-1px);
 }
 
+/* Que se note cuando un botón no se puede usar (por ejemplo "Cobrar" con el carrito vacío) */
+.primary-btn:disabled, .secondary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .full {
   width: 100%;
 }
@@ -946,6 +953,31 @@ input, select {
   border-top: 2px solid var(--line);
   margin-top: 0.5rem;
   padding-top: 0.75rem;
+}
+
+.fiado-box {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.5rem 1rem;
+}
+
+.fiado-alerta {
+  margin-bottom: 1rem;
+}
+
+.fiado-subtitulo {
+  margin: 1.25rem 0 0.75rem;
+}
+
+.inventory-table tr.fila-seleccionada td {
+  background: #eff6ff;
+}
+
+@media (min-width: 981px) {
+  .fiados-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
 }
 
 .cierre-btn {

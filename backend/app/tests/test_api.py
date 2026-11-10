@@ -357,7 +357,8 @@ def test_fiado_rechaza_consumidor_final_limite_e_inactivo(client, cajero_h, admi
 
     # lo rechazado no descontó stock ni sumó deuda
     assert client.get("/api/productos/%s" % producto["id"], headers=admin_h).json()["stock_actual"] == 9
-    assert float(client.get("/api/clientes/%s/movimientos" % c["id"], headers=cajero_h).json()["saldo"]) == 180
+    cuenta = client.get("/api/clientes/%s/movimientos" % c["id"], headers=cajero_h).json()
+    assert float(cuenta["saldo"]) == 180 and cuenta["activo"] is False
 
 
 def test_pagos_de_fiado_y_deudores(client, cajero_h, admin_h, producto):
@@ -372,6 +373,8 @@ def test_pagos_de_fiado_y_deudores(client, cajero_h, admin_h, producto):
     assert client.get("/api/fiados/deudores", headers=cajero_h).status_code == 403
     deudores = client.get("/api/fiados/deudores", headers=admin_h).json()
     assert [(d["cliente_id"], float(d["saldo"]), float(d["disponible"])) for d in deudores] == [(c["id"], 260, 9740)]
+    # ultimo_fiado es la fecha de la venta fiada; ultimo_movimiento incluye el pago
+    assert deudores[0]["ultimo_fiado"] is not None and deudores[0]["ultimo_movimiento"] >= deudores[0]["ultimo_fiado"]
 
     assert client.post(url, headers=cajero_h, json={"monto": 260}).status_code == 201
     assert client.get("/api/fiados/deudores", headers=admin_h).json() == []

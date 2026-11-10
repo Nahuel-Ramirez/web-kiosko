@@ -331,6 +331,7 @@ class PagoFiadoOut(MovimientoFiadoOut):
 class CuentaFiadoOut(BaseModel):
     cliente_id: int
     razon_social: str
+    activo: bool = True
     limite_fiado: Decimal
     saldo: Decimal
     disponible: Decimal
@@ -346,6 +347,7 @@ class DeudorOut(BaseModel):
     limite_fiado: Decimal
     saldo: Decimal
     disponible: Decimal
+    ultimo_fiado: Optional[datetime] = None
     ultimo_movimiento: Optional[datetime] = None
 
 

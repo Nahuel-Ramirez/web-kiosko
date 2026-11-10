@@ -166,9 +166,10 @@ Documentación interactiva completa en `http://localhost:8000/docs` con el backe
 | Productos | `GET /api/productos`, `GET /api/productos/codigo/{codigo}` (ADMIN y CAJERO); alta, edición, stock y baja (ADMIN) | Según rol |
 | Clientes | `GET /api/clientes/buscar?dni=`, `GET/POST /api/clientes` (ADMIN y CAJERO); `PUT/DELETE` (ADMIN) | Según rol |
 | Ventas y turnos | `POST /api/turnos/ventas`, `GET /api/turnos/mis-ventas`, `GET /api/turnos/turno-actual`, `POST /api/turnos/cierre`, `GET /api/turnos/mis-cierres`, `GET /api/turnos/cierre/{id}` | Logueado |
+| Fiado | `GET /api/clientes/{id}/movimientos`, `POST /api/clientes/{id}/pagos` (ADMIN y CAJERO); `GET /api/fiados/deudores` (ADMIN) | Según rol |
 | Reportes de ventas | `GET /api/turnos/reporte/periodo`, `GET /api/turnos/reporte/usuario/{id}` | ADMIN |
 | Analítica | `GET /api/reportes/ventas-por-hora`, `GET /api/reportes/horas-pico`, `GET /api/reportes/productos-mas-vendidos` (HU-09) | ADMIN |
 
-Reglas de negocio relevantes: una venta se guarda de forma atómica (valida cliente, productos, stock suficiente y que el total coincida con el detalle); `metodo_pago` solo admite `EFECTIVO`, `TARJETA` o `TRANSFERENCIA`; el cierre de caja vincula las ventas abiertas del cajero y calcula los totales en el servidor; las fechas de los reportes (`YYYY-MM-DD`) incluyen el día completo.
+Reglas de negocio relevantes: una venta se guarda de forma atómica (valida cliente, productos, stock suficiente y que el total coincida con el detalle); `metodo_pago` admite `EFECTIVO`, `TARJETA`, `TRANSFERENCIA` o `FIADO` (este último solo a un cliente activo, distinto de Consumidor Final y sin pasarse de su `limite_fiado`); el cierre de caja vincula las ventas abiertas del cajero y calcula los totales en el servidor; las fechas de los reportes (`YYYY-MM-DD`) incluyen el día completo.
 
 Tests: `cd backend && python -m pytest`.

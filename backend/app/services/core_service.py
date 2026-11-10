@@ -624,6 +624,7 @@ def get_cuenta_fiado(db: Session, cliente_id: int) -> Optional[dict]:
     return {
         "cliente_id": cliente.id,
         "razon_social": cliente.razon_social,
+        "activo": cliente.activo,
         "limite_fiado": limite,
         "saldo": saldo,
         "disponible": limite - saldo,
@@ -634,8 +635,14 @@ def get_cuenta_fiado(db: Session, cliente_id: int) -> Optional[dict]:
 def get_deudores(db: Session) -> List[dict]:
     """Clientes que deben algo, de mayor a menor deuda."""
     saldo = func.sum(_monto_con_signo())
+    ultimo_fiado = func.max(case((MovimientoFiado.tipo == "VENTA", MovimientoFiado.fecha)))
     filas = (
-        db.query(Cliente, saldo.label("saldo"), func.max(MovimientoFiado.fecha).label("ultimo_movimiento"))
+        db.query(
+            Cliente,
+            saldo.label("saldo"),
+            ultimo_fiado.label("ultimo_fiado"),
+            func.max(MovimientoFiado.fecha).label("ultimo_movimiento"),
+        )
         .join(MovimientoFiado, MovimientoFiado.cliente_id == Cliente.id)
         .group_by(Cliente.id)
         .having(saldo > 0)
@@ -643,7 +650,7 @@ def get_deudores(db: Session) -> List[dict]:
         .all()
     )
     deudores = []
-    for cliente, saldo_cliente, ultimo in filas:
+    for cliente, saldo_cliente, fiado, ultimo in filas:
         limite = _dinero(cliente.limite_fiado)
         saldo_cliente = _dinero(saldo_cliente)
         deudores.append({
@@ -655,6 +662,7 @@ def get_deudores(db: Session) -> List[dict]:
             "limite_fiado": limite,
             "saldo": saldo_cliente,
             "disponible": limite - saldo_cliente,
+            "ultimo_fiado": fiado,
             "ultimo_movimiento": ultimo,
         })
     return deudores
