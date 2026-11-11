@@ -133,7 +133,7 @@ export function Admin() {
   };
 
   const handleDelete = async (product) => {
-    if (!window.confirm(`Eliminar "${product.name}"?`)) return;
+    if (!window.confirm(`¿Eliminar "${product.name}"?`)) return;
     setError('');
     setSuccess('');
     setBusyId(product.id);

@@ -6,10 +6,18 @@ from sqlalchemy.orm import Session
 from app.core.security import get_current_user, require_role
 from app.db.session import get_db
 from app.models.usuario import Usuario
-from app.schemas.core import UsuarioCreate, UsuarioOut, UsuarioUpdate
+from app.schemas.core import (
+    ResolverSolicitudPassword,
+    SolicitudPasswordOut,
+    UsuarioCreate,
+    UsuarioOut,
+    UsuarioUpdate,
+)
 from app.services.core_service import (
+    atender_solicitud_password,
     create_usuario,
     delete_usuario,
+    get_solicitudes_password_pendientes,
     get_usuario,
     get_usuario_by_dni,
     get_usuario_by_username,
@@ -38,6 +46,34 @@ def listar_usuarios(
 ):
     """Lista todos los usuarios (solo ADMIN)."""
     return get_usuarios(db, skip=skip, limit=limit)
+
+
+# Las rutas de pedidos de contraseña van antes de /{usuario_id} para que no se confundan.
+@router.get("/solicitudes-password", response_model=List[SolicitudPasswordOut])
+def listar_solicitudes_password(db: Session = Depends(get_db), _: Usuario = Depends(solo_admin)):
+    """Pedidos de "¿Olvidó su contraseña?" pendientes, del más viejo al más nuevo (solo ADMIN)."""
+    return get_solicitudes_password_pendientes(db)
+
+
+@router.post("/solicitudes-password/{solicitud_id}/resolver", response_model=SolicitudPasswordOut)
+def resolver_solicitud_password(
+    solicitud_id: int,
+    datos: ResolverSolicitudPassword,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(solo_admin),
+):
+    """Le pone la contraseña nueva al usuario y marca el pedido como RESUELTA (solo ADMIN)."""
+    return atender_solicitud_password(db, solicitud_id, admin, datos.password_nueva)
+
+
+@router.post("/solicitudes-password/{solicitud_id}/rechazar", response_model=SolicitudPasswordOut)
+def rechazar_solicitud_password(
+    solicitud_id: int,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(solo_admin),
+):
+    """Marca el pedido como RECHAZADA sin tocar la contraseña (solo ADMIN)."""
+    return atender_solicitud_password(db, solicitud_id, admin)
 
 
 @router.get("/{usuario_id}", response_model=UsuarioOut)
@@ -98,6 +134,6 @@ def eliminar_usuario(
 ):
     """Elimina un usuario (solo ADMIN). No permite auto-eliminarse."""
     if usuario_id == usuario_actual.id:
-        raise HTTPException(status_code=400, detail="No puedes eliminarte a ti mismo")
+        raise HTTPException(status_code=400, detail="No podés eliminar tu propio usuario")
     if not delete_usuario(db, usuario_id):
         raise HTTPException(status_code=404, detail="Usuario no encontrado")

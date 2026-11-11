@@ -76,9 +76,9 @@ export function Dashboard() {
 
   const stats = [
     { label: 'Productos', value: products.length.toString() },
-    { label: 'Stock critico', value: lowStockProducts.length.toString() },
-    { label: 'Ventas del dia', value: resumenHoy.cantidad.toString() },
-    { label: 'Facturacion', value: formatMoney(resumenHoy.total) }
+    { label: 'Stock crítico', value: lowStockProducts.length.toString() },
+    { label: 'Ventas del día', value: resumenHoy.cantidad.toString() },
+    { label: 'Facturación', value: formatMoney(resumenHoy.total) }
   ];
 
   return (
@@ -135,7 +135,7 @@ export function Dashboard() {
 
         <div className="card">
           <div className="card-header">
-            <h3>Mis ultimas ventas de hoy</h3>
+            <h3>Mis últimas ventas de hoy</h3>
           </div>
           {ventasError && <div className="form-message error">{ventasError}</div>}
           <ul id="salesList" className="item-list">

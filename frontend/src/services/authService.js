@@ -3,10 +3,29 @@ import { API_URL } from './api';
 async function extraerMensajeError(response) {
   try {
     const data = await response.json();
+    if (Array.isArray(data.detail) && data.detail.length) return data.detail[0].msg.replace(/^Value error, /, '');
     return data.detail || 'Ocurrió un error inesperado.';
   } catch {
     return 'Ocurrió un error inesperado.';
   }
+}
+
+/**
+ * POST /api/auth/forgot-password: deja el pedido de "¿Olvidó su contraseña?" para que lo
+ * atienda un administrador. Devuelve el mensaje de confirmación del backend.
+ */
+export async function solicitarCambioPassword(username, justificacion) {
+  const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, justificacion }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await extraerMensajeError(response));
+  }
+
+  return (await response.json()).detail;
 }
 
 /**

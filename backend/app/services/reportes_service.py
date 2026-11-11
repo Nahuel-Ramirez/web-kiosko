@@ -123,14 +123,14 @@ def horas_pico(db: Session, desde: datetime, hasta: datetime) -> HorasPicoOut:
                 hora_inicio=inicio,
                 hora_fin=fin,
                 ventas_esperadas=esperadas,
-                motivo="Promedio de %s ventas/dia, %.0f%% sobre el promedio horario"
+                motivo="Promedio de %s ventas/día, %.0f%% sobre el promedio horario"
                 % (esperadas, (esperadas / (media * len(grupo)) - 1) * 100),
             )
         )
         recomendaciones.append(
             RecomendacionItem(
                 tipo="cajero",
-                mensaje="Reforzar cajeros entre las %02d:00 y las %02d:00 (≈ %s ventas por dia esperadas)."
+                mensaje="Reforzar cajeros entre las %02d:00 y las %02d:00 (≈ %s ventas por día esperadas)."
                 % (inicio, fin, esperadas),
             )
         )
@@ -147,7 +147,7 @@ def horas_pico(db: Session, desde: datetime, hasta: datetime) -> HorasPicoOut:
                 recomendaciones.append(
                     RecomendacionItem(
                         tipo="stock",
-                        mensaje="Reponer '%s': stock %s vs. consumo esperado en horas pico ≈ %.1f u./dia."
+                        mensaje="Reponer '%s': stock %s vs. consumo esperado en horas pico ≈ %.1f u./día."
                         % (p.nombre, p.stock_actual, esperado),
                     )
                 )

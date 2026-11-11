@@ -54,6 +54,64 @@ def test_cajero_desactivado_no_loguea(client, admin_h):
     assert client.post("/api/auth/login", json={"username": "j", "password": "p123"}).status_code == 401
 
 
+# ---------- olvidé mi contraseña ----------
+def pedir_password(client, username, motivo="Me la olvidé"):
+    return client.post("/api/auth/forgot-password", json={"username": username, "justificacion": motivo})
+
+
+def test_pedido_de_password_no_revela_usuarios_ni_se_duplica(client, admin_h, cajero_h):
+    existe = pedir_password(client, "cajero", "  No me acuerdo la clave  ")
+    no_existe = pedir_password(client, "nadie")
+    assert existe.status_code == no_existe.status_code == 202
+    assert existe.json() == no_existe.json()
+    assert pedir_password(client, "cajero", "Otra vez").status_code == 202
+
+    pendientes = client.get("/api/usuarios/solicitudes-password", headers=admin_h).json()
+    assert [(s["username"], s["rol"], s["motivo"], s["estado"]) for s in pendientes] == [
+        ("cajero", "CAJERO", "No me acuerdo la clave", "PENDIENTE")]
+    assert client.get("/api/usuarios/solicitudes-password", headers=cajero_h).status_code == 403
+    assert client.get("/api/usuarios/solicitudes-password").status_code == 401
+
+
+def test_pedido_de_password_valida_datos_y_usuario_activo(client, admin_h):
+    assert pedir_password(client, "cajero", "   ").status_code == 422
+    assert pedir_password(client, " ", "motivo").status_code == 422
+    assert pedir_password(client, "cajero", "x" * 501).status_code == 422
+    uid = client.post("/api/usuarios", headers=admin_h, json={"nombre": "J", "username": "j", "password": "p123", "rol": "CAJERO"}).json()["id"]
+    client.put("/api/usuarios/%s" % uid, headers=admin_h, json={"activo": False})
+    assert pedir_password(client, "j").status_code == 202
+    assert client.get("/api/usuarios/solicitudes-password", headers=admin_h).json() == []
+
+
+def test_admin_resuelve_el_pedido_con_una_password_nueva(client, admin_h):
+    pedir_password(client, "cajero")
+    sid = client.get("/api/usuarios/solicitudes-password", headers=admin_h).json()[0]["id"]
+    url = "/api/usuarios/solicitudes-password/%s/resolver" % sid
+    assert client.post(url, headers=admin_h, json={"password_nueva": "abc"}).status_code == 422
+    assert client.post(url, headers=admin_h, json={"password_nueva": " nueva1 "}).status_code == 422
+
+    r = client.post(url, headers=admin_h, json={"password_nueva": "nueva123"})
+    assert r.status_code == 200 and r.json()["estado"] == "RESUELTA" and r.json()["fecha_atencion"]
+    assert client.post("/api/auth/login", json={"username": "cajero", "password": "nueva123"}).status_code == 200
+    assert client.post("/api/auth/login", json={"username": "cajero", "password": "cajero123"}).status_code == 401
+    assert client.get("/api/usuarios/solicitudes-password", headers=admin_h).json() == []
+    assert client.post(url, headers=admin_h, json={"password_nueva": "otra1234"}).status_code == 409
+    assert client.post("/api/usuarios/solicitudes-password/999/resolver", headers=admin_h, json={"password_nueva": "otra1234"}).status_code == 404
+
+    assert pedir_password(client, "cajero").status_code == 202
+    assert len(client.get("/api/usuarios/solicitudes-password", headers=admin_h).json()) == 1
+
+
+def test_admin_rechaza_el_pedido_y_la_password_no_cambia(client, admin_h, cajero_h):
+    pedir_password(client, "cajero")
+    sid = client.get("/api/usuarios/solicitudes-password", headers=admin_h).json()[0]["id"]
+    assert client.post("/api/usuarios/solicitudes-password/%s/rechazar" % sid, headers=cajero_h).status_code == 403
+    r = client.post("/api/usuarios/solicitudes-password/%s/rechazar" % sid, headers=admin_h)
+    assert r.status_code == 200 and r.json()["estado"] == "RECHAZADA"
+    assert client.post("/api/auth/login", json={"username": "cajero", "password": "cajero123"}).status_code == 200
+    assert client.get("/api/usuarios/solicitudes-password", headers=admin_h).json() == []
+
+
 # ---------- productos ----------
 def test_producto_valores_negativos_rechazados(client, admin_h):
     r = client.post("/api/productos", headers=admin_h, json={"codigo_barras": "9", "nombre": "x", "precio_costo": -1, "precio_venta": 2})
@@ -387,7 +445,8 @@ def test_pagos_de_fiado_y_deudores(client, cajero_h, admin_h, producto):
     pago = client.post(url, headers=cajero_h, json={"monto": 100, "observaciones": "a cuenta"})
     assert pago.status_code == 201 and pago.json()["tipo"] == "PAGO" and float(pago.json()["saldo"]) == 260
 
-    assert client.get("/api/fiados/deudores", headers=cajero_h).status_code == 403
+    # el cajero también ve los deudores (cobra las deudas desde la pestaña Fiados)
+    assert client.get("/api/fiados/deudores", headers=cajero_h).json() == client.get("/api/fiados/deudores", headers=admin_h).json()
     deudores = client.get("/api/fiados/deudores", headers=admin_h).json()
     assert [(d["cliente_id"], float(d["saldo"]), float(d["disponible"])) for d in deudores] == [(c["id"], 260, 9740)]
     # ultimo_fiado es la fecha de la venta fiada; ultimo_movimiento incluye el pago

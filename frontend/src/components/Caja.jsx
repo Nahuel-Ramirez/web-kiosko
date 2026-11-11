@@ -27,6 +27,7 @@ export function Caja() {
     formatMoney,
     addToCart,
     updateCartQuantity,
+    removeFromCart,
     getCartSubtotal,
     getCartDiscount,
     handleCheckout,
@@ -296,7 +297,7 @@ export function Caja() {
             </div>
             <div id="cartItems" className="cart-items scroll-y">
               {cart.length === 0 ? (
-                <div className="empty-state">El carrito esta vacio.</div>
+                <div className="empty-state">El carrito está vacío.</div>
               ) : (
                 cart.map(item => (
                   <div key={item.id} className="cart-item">
@@ -331,7 +332,24 @@ export function Caja() {
                         />
                       </div>
                     </div>
-                    <div className="item-total">{formatMoney(item.price * item.quantity)}</div>
+                    <div className="cart-item-side">
+                      <div className="item-total">{formatMoney(item.price * item.quantity)}</div>
+                      <button
+                        type="button"
+                        className="remove-btn"
+                        onClick={() => removeFromCart(item.id)}
+                        aria-label={`Quitar ${item.name} del carrito`}
+                        title="Quitar del carrito"
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"
+                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v6M14 11v6" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -339,7 +357,7 @@ export function Caja() {
 
             <div className="totals">
               <div><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div>
-              <div><span>Descuento</span><strong>-{formatMoney(discount)}</strong></div>
+              <div><span>Descuento</span><strong>{discount > 0 ? `-${formatMoney(discount)}` : formatMoney(0)}</strong></div>
               <div className="total-line"><span>Total</span><strong>{formatMoney(total)}</strong></div>
             </div>
 
@@ -464,7 +482,7 @@ export function Caja() {
                   />
                 </label>
                 <label>
-                  Efectivo contado <span className="required">*</span>
+                  <span>Efectivo contado <span className="required">*</span></span>
                   <input
                     id="efectivoContado"
                     type="number"

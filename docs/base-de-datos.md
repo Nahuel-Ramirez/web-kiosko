@@ -19,6 +19,8 @@ erDiagram
     usuarios ||--o{ movimientos_fiado : "registra"
     ventas |o--o| movimientos_fiado : "genera deuda"
     cierres_caja |o--o{ movimientos_fiado : "cobra pagos"
+    usuarios ||--o{ solicitudes_password : "pide"
+    usuarios |o--o{ solicitudes_password : "atiende"
 
     usuarios {
         int id PK
@@ -96,6 +98,15 @@ erDiagram
         text observaciones
         int cierre_id FK "solo en PAGO"
     }
+    solicitudes_password {
+        int id PK
+        int usuario_id FK
+        text motivo
+        varchar estado "PENDIENTE, RESUELTA o RECHAZADA"
+        timestamptz fecha_solicitud
+        int atendida_por FK
+        timestamptz fecha_atencion
+    }
 ```
 
 Cómo leer las relaciones:
@@ -112,6 +123,8 @@ Cómo leer las relaciones:
 | `usuarios` → `movimientos_fiado` | 1 a muchos | Quién registró la venta fiada o cobró el pago. |
 | `cierres_caja` → `movimientos_fiado` | 0 o 1 a muchos | Un pago de deuda entra en el cierre del turno en que se cobró. |
 | `ventas` → `movimientos_fiado` | 0 o 1 a 0 o 1 | Cada venta fiada genera exactamente un movimiento `VENTA`; las demás ventas, ninguno. |
+| `usuarios` → `solicitudes_password` (`usuario_id`) | 1 a muchos | Pedidos de "¿Olvidó su contraseña?" de cada usuario; como mucho uno pendiente. |
+| `usuarios` → `solicitudes_password` (`atendida_por`) | 0 o 1 a muchos | El administrador que resolvió o rechazó el pedido. |
 
 ## Tablas
 
@@ -234,6 +247,22 @@ Cuenta corriente del fiado: cada venta fiada suma deuda y cada pago la baja.
 
 Los pagos se toman como cobrados en efectivo: al cerrar el turno se suman en `cierres_caja.total_cobros_fiado`.
 
+### `solicitudes_password`
+
+Pedidos de "¿Olvidó su contraseña?". Como la app no manda mails, el usuario deja el pedido desde el login con el motivo, y un administrador (pestaña Cajeros) le pone una contraseña nueva o lo rechaza. Queda registrado quién lo atendió y cuándo.
+
+| Columna | Tipo | Nulo | Por defecto | Descripción |
+| --- | --- | --- | --- | --- |
+| `id` | `SERIAL` | No | autonumérico | Clave primaria. |
+| `usuario_id` | `INT` | No | | FK a `usuarios`: quién pidió la contraseña nueva. Si se borra el usuario, se borran sus pedidos. |
+| `motivo` | `TEXT` | No | | Justificación que escribió el usuario (para auditoría). No puede estar vacío; el backend acepta hasta 500 caracteres. |
+| `estado` | `VARCHAR(10)` | No | `PENDIENTE` | `PENDIENTE`, `RESUELTA` (se le puso una contraseña nueva) o `RECHAZADA`. |
+| `fecha_solicitud` | `TIMESTAMPTZ` | No | ahora | |
+| `atendida_por` | `INT` | Sí | | FK a `usuarios`: el administrador que lo resolvió o rechazó. Si ese usuario se borra, queda en `NULL`. |
+| `fecha_atencion` | `TIMESTAMPTZ` | Sí | | Cuándo se atendió. `NULL` mientras está pendiente y obligatoria después (CHECK `solicitudes_password_atencion_check`). |
+
+El backend responde lo mismo exista o no el usuario, para no revelar qué usuarios hay, y no registra pedidos de usuarios inactivos.
+
 ## Vista `vista_ventas_descuento`
 
 El POS aplica un descuento y lo reparte entre las líneas de la venta. Como `detalle_ventas` guarda el precio de lista y el subtotal ya descontado, el descuento se obtiene de la diferencia:
@@ -270,6 +299,7 @@ SELECT * FROM vista_saldos_fiado WHERE saldo > 0 ORDER BY saldo DESC;
 - Precios, stock, totales, cantidades, montos de caja y límites de fiado no pueden ser negativos.
 - A Consumidor Final no se le fía: su `limite_fiado` es `0` y una venta `FIADO` no puede tener `cliente_id = 1`.
 - Cada venta fiada tiene un solo movimiento de deuda, y un pago nunca apunta a una venta.
+- Un usuario tiene como mucho un pedido de contraseña `PENDIENTE` (índice único parcial), y un pedido atendido siempre tiene `fecha_atencion`.
 - No se puede borrar un usuario, cliente o producto que tenga ventas (las claves foráneas lo impiden). Para sacarlos de uso se desactivan.
 - Las fechas se guardan con zona horaria y la base está configurada en `America/Argentina/Buenos_Aires`, para que los reportes por hora muestren la hora local.
 
@@ -292,6 +322,7 @@ Además de los que PostgreSQL crea solo para las claves primarias y los campos �
 | `idx_movimientos_fiado_cliente_fecha` | Saldo y movimientos de la cuenta de un cliente. |
 | `idx_movimientos_fiado_usuario` | Cobros de fiado del turno abierto y control antes de borrar un usuario. |
 | `idx_movimientos_fiado_cierre` | Cobros de fiado de un cierre. |
+| `uq_solicitudes_password_pendiente` | Único y parcial (`WHERE estado = 'PENDIENTE'`): impide dos pedidos de contraseña pendientes del mismo usuario. |
 
 ## Datos iniciales
 

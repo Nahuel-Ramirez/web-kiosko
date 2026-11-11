@@ -14,6 +14,7 @@ import {
   crearCierre as crearCierreRequest
 } from '../services/turnoService';
 import { listarDeudores } from '../services/fiadoService';
+import { listarSolicitudesPassword } from '../services/usuariosService';
 
 const AppContext = createContext(null);
 
@@ -29,7 +30,6 @@ export function AppProvider({ children }) {
   const [activePanel, setActivePanel] = useState('dashboard');
   const [deudores, setDeudores] = useState([]);
   const [deudoresError, setDeudoresError] = useState('');
-  const esAdmin = currentUser?.role === 'Administrador';
 
   const loadProducts = useCallback(async () => {
     setProductsLoading(true);
@@ -56,9 +56,10 @@ export function AppProvider({ children }) {
     }
   }, [currentUser, loadProducts]);
 
-  // Clientes con deuda de fiado: solo el administrador puede verlos (pestaña Fiados y alertas).
+  // Clientes con deuda de fiado (pestaña Fiados y alertas): los ven el administrador y el cajero.
+  const logueado = Boolean(currentUser);
   const cargarDeudores = useCallback(async () => {
-    if (!esAdmin) {
+    if (!logueado) {
       setDeudores([]);
       setDeudoresError('');
       return;
@@ -69,7 +70,7 @@ export function AppProvider({ children }) {
     } catch (err) {
       setDeudoresError(err.message || 'No se pudieron cargar los clientes con deuda.');
     }
-  }, [esAdmin]);
+  }, [logueado]);
 
   useEffect(() => {
     cargarDeudores();
@@ -78,6 +79,28 @@ export function AppProvider({ children }) {
   const getFiadoAlertas = useCallback(() => {
     return deudores.filter(deudor => Number(deudor.saldo) >= Number(deudor.limite_fiado));
   }, [deudores]);
+
+  // Pedidos de "¿Olvidó su contraseña?" pendientes: solo el administrador los atiende (en Cajeros).
+  // Se vuelven a pedir al cambiar de pestaña, así el contador del menú se mantiene al día.
+  const tokenAdmin = currentUser?.role === 'Administrador' ? currentUser.token : null;
+  const [solicitudesPassword, setSolicitudesPassword] = useState([]);
+  const cargarSolicitudesPassword = useCallback(async () => {
+    if (!tokenAdmin) return;
+    try {
+      setSolicitudesPassword(await listarSolicitudesPassword(tokenAdmin));
+    } catch {
+      setSolicitudesPassword([]);
+    }
+  }, [tokenAdmin]);
+
+  useEffect(() => {
+    if (!tokenAdmin) return undefined;
+    let vigente = true;
+    listarSolicitudesPassword(tokenAdmin)
+      .then((lista) => { if (vigente) setSolicitudesPassword(lista); })
+      .catch(() => { if (vigente) setSolicitudesPassword([]); });
+    return () => { vigente = false; };
+  }, [tokenAdmin, activePanel]);
 
   const formatMoney = useCallback((value) => {
     return new Intl.NumberFormat('es-AR', {
@@ -157,10 +180,15 @@ export function AppProvider({ children }) {
       if (newQuantity <= 0) {
         return prev.filter(entry => entry.id !== productId);
       }
-      return prev.map(entry => 
+      return prev.map(entry =>
         entry.id === productId ? { ...entry, quantity: newQuantity } : entry
       );
     });
+  }, []);
+
+  // Saca el producto entero del carrito (por ejemplo, si el cliente decide no llevarlo).
+  const removeFromCart = useCallback((productId) => {
+    setCart(prev => prev.filter(entry => entry.id !== productId));
   }, []);
 
   const getCartSubtotal = useCallback(() => {
@@ -299,6 +327,7 @@ export function AppProvider({ children }) {
     updateProduct,
     addToCart,
     updateCartQuantity,
+    removeFromCart,
     getCartSubtotal,
     getCartDiscount,
     handleCheckout,
@@ -309,7 +338,9 @@ export function AppProvider({ children }) {
     deudores,
     deudoresError,
     cargarDeudores,
-    getFiadoAlertas
+    getFiadoAlertas,
+    solicitudesPassword: tokenAdmin ? solicitudesPassword : [],
+    cargarSolicitudesPassword
   };
 
   return (

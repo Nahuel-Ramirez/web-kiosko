@@ -195,7 +195,7 @@ input, select {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -297,7 +297,7 @@ input, select {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
   margin-bottom: 1.25rem;
 }
@@ -433,6 +433,8 @@ input, select {
 }
 
 .form-field label {
+  /* block (no el flex en columna de la regla global de label): el "*" queda al lado del texto */
+  display: block;
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--text);
@@ -647,6 +649,12 @@ input, select {
   font-weight: 700;
   background: var(--brand);
   color: white;
+}
+
+.product-card button:disabled {
+  background: #cbd5e1;
+  color: #475569;
+  cursor: not-allowed;
 }
 
 .cart-items {
@@ -1008,7 +1016,30 @@ input, select {
   display: block;
 }
 
-@media (min-width: 981px) {
+/* Carrito: total de la línea y botón para quitar el producto (papelera) */
+.cart-item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.remove-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #b91c1c;
+  transition: background 0.15s ease;
+}
+
+.remove-btn:hover {
+  background: #fecaca;
+}
+
+@media (min-width: 1200px) {
   .fiados-grid {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
@@ -2565,51 +2596,288 @@ kbd {
   width: 100%;
 }
 
-/* Tablet y celular (una sola columna). Va al final para pisar las reglas de arriba. */
-@media (max-width: 980px) {
-  /* minmax(0, 1fr): la columna no se estira al ancho de la fila del menú */
-  .app-shell {
+/* Encabezado del menú: marca y botón ☰ (el botón solo se ve en tablet y celular) */
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sidebar-top .brand-mini {
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.15);
+  color: white;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+/* Grillas: una tarjeta nunca se estira más que su columna; lo ancho (tablas) se desliza adentro */
+.content-grid > *,
+.stats-grid > *,
+.catalog-grid > * {
+  min-width: 0;
+}
+
+.header-actions {
+  flex-wrap: wrap;
+}
+
+/* Tablas: si la columna es angosta, los botones de acción bajan a otra línea en vez de
+   ensanchar la tabla. */
+.inventory-table .action-buttons {
+  flex-wrap: wrap;
+}
+
+/* Login: "¿Olvidó su contraseña?" con aspecto de link y usable con el teclado */
+.reset-link {
+  display: block;
+  margin: 1rem auto 0;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  color: #93c5fd;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.reset-link:hover {
+  color: white;
+}
+
+.reset-link:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* El modal se abre adentro del login (texto blanco): con fondo blanco necesita texto oscuro */
+.modal {
+  color: var(--text);
+}
+
+.reset-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.reset-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Contador de pendientes en una pestaña del menú (pedidos de contraseña en Cajeros) */
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.nav-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Con el menú plegado (celular y tablet) el contador se ve sobre el botón ☰ */
+.menu-toggle {
+  position: relative;
+}
+
+.menu-toggle-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+}
+
+/* Cajeros: pedidos de "¿Olvidó su contraseña?" */
+.solicitudes-card {
+  margin-bottom: 1rem;
+}
+
+.solicitudes-vacio {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+}
+
+.solicitudes-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.solicitud-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.solicitud-info {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.solicitud-info small {
+  color: var(--muted);
+}
+
+.solicitud-motivo {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.solicitud-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.solicitud-acciones input {
+  width: 190px;
+}
+
+@media (max-width: 900px) {
+  .solicitud-item {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Menú en una fila que se desliza, en vez de una columna de ~450px arriba de todo */
+  .solicitud-acciones input {
+    flex: 1 1 100%;
+    width: auto;
+  }
+
+  .solicitud-acciones button {
+    flex: 1 1 0;
+    min-height: 44px;
+  }
+}
+
+/* Computadora: el menú queda fijo a la altura de la pantalla, así "Cerrar sesión"
+   se ve siempre aunque la página (por ejemplo la Caja) sea más alta que la pantalla. */
+@media (min-width: 1200px) {
   .sidebar {
-    padding: 0.75rem;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  /* Productos y Clientes: en notebooks la tabla no entra al lado del formulario sin cortarse,
+     así que va abajo a todo el ancho; en pantallas anchas, formulario 1/3 y tabla 2/3. */
+  #adminPanel .content-grid,
+  #clientesPanel .content-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inventory-table th,
+  .inventory-table td {
+    padding: 0.85rem 0.7rem;
+  }
+}
+
+@media (min-width: 1500px) {
+  #adminPanel .content-grid,
+  #clientesPanel .content-grid {
+    grid-template-columns: minmax(300px, 1fr) minmax(0, 2fr);
+  }
+}
+
+/* Tablet y celular (una sola columna). Va al final para pisar las reglas de arriba. */
+@media (max-width: 1199px) {
+  /* minmax(0, 1fr): la columna nunca es más ancha que la pantalla */
+  .app-shell,
+  .two-columns,
+  .stats-grid,
+  .catalog-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* La fila del menú mide lo que ocupa; el espacio que sobra es para el contenido */
+  .app-shell {
+    grid-template-rows: auto 1fr;
+  }
+
+  /* Menú plegable: barra fija arriba con la marca y el botón ☰; al tocarlo se despliegan
+     todas las pestañas y "Cerrar sesión". */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 900;
+    padding: 0.6rem 0.75rem;
     gap: 0.6rem;
   }
 
   .brand-mini {
-    padding: 0 0.25rem 0.6rem;
+    padding: 0;
+    border-bottom: none;
   }
 
-  .nav {
-    flex-direction: row;
-    overflow-x: auto;
-    gap: 0.4rem;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+  .menu-toggle {
+    display: grid;
+    place-items: center;
   }
 
-  .nav::-webkit-scrollbar {
+  .sidebar .nav,
+  .sidebar .sidebar-footer {
     display: none;
   }
 
-  .nav-btn {
-    flex: 0 0 auto;
-    min-height: 44px;
-    padding: 0.6rem 0.9rem;
-    white-space: nowrap;
+  .sidebar.menu-abierto .nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.4rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.22);
   }
 
-  .sidebar-footer {
+  .sidebar.menu-abierto .sidebar-footer {
+    display: flex;
     flex-direction: row;
     align-items: center;
     margin-top: 0;
   }
 
+  .nav-btn {
+    min-height: 44px;
+    padding: 0.6rem 0.9rem;
+  }
+
   .sidebar-footer .secondary-btn {
     flex: 1;
     min-height: 44px;
+  }
+
+  .inventory-table th,
+  .inventory-table td {
+    padding: 0.6rem 0.5rem;
   }
 
   /* Caja: catálogo más bajo para que el carrito y "Cobrar" queden a mano */
@@ -2637,7 +2905,8 @@ kbd {
     flex: 1 1 100%;
   }
 
-  #cajaPanel .qty-btn {
+  #cajaPanel .qty-btn,
+  #cajaPanel .remove-btn {
     width: 44px;
     height: 44px;
     font-size: 1.25rem;
@@ -2665,6 +2934,23 @@ kbd {
 @media (max-width: 700px) {
   .main-panel {
     padding: 1rem 0.75rem;
+  }
+
+  /* Login: menos margen para que la tarjeta entre en pantallas de 320px */
+  .login-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .brand-panel {
+    padding: 2rem 1rem 0.5rem;
+  }
+
+  .login-card {
+    padding: 1rem 0.75rem 2rem;
+  }
+
+  .login-card > div {
+    padding: 1.25rem;
   }
 
   .card {

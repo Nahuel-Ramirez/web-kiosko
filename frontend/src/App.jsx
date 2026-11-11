@@ -53,7 +53,7 @@ function AppContent() {
       case 'clientes':
         return <Clientes />;
       case 'fiados':
-        return isAdmin ? <Fiados /> : <Caja />;
+        return <Fiados />;
       default:
         return <Dashboard />;
     }

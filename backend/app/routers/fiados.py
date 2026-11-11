@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
@@ -12,16 +12,7 @@ from app.services.core_service import get_deudores
 router = APIRouter(prefix="/api/fiados", tags=["fiados"])
 
 
-def solo_admin(usuario: Usuario = Depends(get_current_user)) -> Usuario:
-    if usuario.rol != "ADMIN":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo administradores pueden ver los deudores",
-        )
-    return usuario
-
-
 @router.get("/deudores", response_model=List[DeudorOut])
-def deudores(db: Session = Depends(get_db), _: Usuario = Depends(solo_admin)):
-    """Clientes con deuda de fiado, de mayor a menor (solo ADMIN)."""
+def deudores(db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)):
+    """Clientes con deuda de fiado, de mayor a menor (ADMIN y CAJERO: el cajero cobra las deudas)."""
     return get_deudores(db)
