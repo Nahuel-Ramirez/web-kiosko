@@ -1,10 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { listarUsuarios, crearUsuario, actualizarUsuario, eliminarUsuario } from '../services/usuariosService';
+import { useApp } from '../context/AppContext';
+import {
+  listarUsuarios,
+  crearUsuario,
+  actualizarUsuario,
+  eliminarUsuario,
+  resolverSolicitudPassword,
+  rechazarSolicitudPassword
+} from '../services/usuariosService';
+
+const formatFecha = (iso) => new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 
 export function Cajeros() {
   const { currentUser } = useAuth();
   const token = currentUser?.token;
+  const { solicitudesPassword, cargarSolicitudesPassword } = useApp();
+  const [clavesNuevas, setClavesNuevas] = useState({});
+  const [solicitudMsg, setSolicitudMsg] = useState({ tipo: '', texto: '' });
+  const [atendiendo, setAtendiendo] = useState(null);
 
   const [cajeros, setCajeros] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +103,51 @@ export function Cajeros() {
     }
   };
 
+  const handleResolver = async (e, solicitud) => {
+    e.preventDefault();
+    const clave = clavesNuevas[solicitud.id] || '';
+    if (clave !== clave.trim()) {
+      setSolicitudMsg({ tipo: 'error', texto: 'La contraseña no puede empezar ni terminar con espacios.' });
+      return;
+    }
+    if (clave.length < 4) {
+      setSolicitudMsg({ tipo: 'error', texto: 'La contraseña debe tener al menos 4 caracteres.' });
+      return;
+    }
+    setAtendiendo(solicitud.id);
+    try {
+      await resolverSolicitudPassword(token, solicitud.id, clave);
+      setSolicitudMsg({
+        tipo: 'success',
+        texto: `Contraseña de ${solicitud.nombre} cambiada. Avísele la nueva para que pueda ingresar.`
+      });
+      setClavesNuevas((prev) => {
+        const resto = { ...prev };
+        delete resto[solicitud.id];
+        return resto;
+      });
+    } catch (err) {
+      setSolicitudMsg({ tipo: 'error', texto: err.message });
+    } finally {
+      setAtendiendo(null);
+      cargarSolicitudesPassword();
+    }
+  };
+
+  const handleRechazar = async (solicitud) => {
+    if (!window.confirm(`¿Rechazar el pedido de ${solicitud.nombre}? Su contraseña no cambia.`)) return;
+    setAtendiendo(solicitud.id);
+    try {
+      await rechazarSolicitudPassword(token, solicitud.id);
+      setSolicitudMsg({ tipo: 'success', texto: `Pedido de ${solicitud.nombre} rechazado.` });
+    } catch (err) {
+      setSolicitudMsg({ tipo: 'error', texto: err.message });
+    } finally {
+      setAtendiendo(null);
+      cargarSolicitudesPassword();
+    }
+  };
+
   const handleEliminar = async (cajero) => {
     if (!window.confirm(`¿Eliminar a "${cajero.nombre}"? Esta acción no se puede deshacer.`)) return;
     setError('');
@@ -102,6 +161,67 @@ export function Cajeros() {
 
   return (
     <section id="cajerosPanel" className="panel active-panel">
+      {(solicitudesPassword.length > 0 || solicitudMsg.texto) && (
+        <div className="card solicitudes-card">
+          <div className="card-header">
+            <h3>Pedidos de cambio de contraseña</h3>
+            {solicitudesPassword.length > 0 && (
+              <span className="badge">
+                {solicitudesPassword.length} {solicitudesPassword.length === 1 ? 'pendiente' : 'pendientes'}
+              </span>
+            )}
+          </div>
+          {solicitudMsg.texto && (
+            <div className={`form-message ${solicitudMsg.tipo}`} role="status">{solicitudMsg.texto}</div>
+          )}
+          {solicitudesPassword.length === 0 ? (
+            <p className="solicitudes-vacio">No hay pedidos pendientes.</p>
+          ) : (
+            <ul className="solicitudes-list">
+              {solicitudesPassword.map((solicitud) => (
+                <li key={solicitud.id} className="solicitud-item">
+                  <div className="solicitud-info">
+                    <strong>{solicitud.nombre}</strong>
+                    <small>
+                      Usuario {solicitud.username} · {solicitud.rol === 'ADMIN' ? 'Administrador' : 'Cajero'} · {formatFecha(solicitud.fecha_solicitud)}
+                    </small>
+                    <p className="solicitud-motivo">{solicitud.motivo}</p>
+                  </div>
+                  <form className="solicitud-acciones" onSubmit={(e) => handleResolver(e, solicitud)}>
+                    <label className="visually-hidden" htmlFor={`claveNueva${solicitud.id}`}>
+                      Contraseña nueva para {solicitud.nombre}
+                    </label>
+                    <input
+                      type="password"
+                      id={`claveNueva${solicitud.id}`}
+                      value={clavesNuevas[solicitud.id] || ''}
+                      onChange={(e) => {
+                        setClavesNuevas((prev) => ({ ...prev, [solicitud.id]: e.target.value }));
+                        setSolicitudMsg({ tipo: '', texto: '' });
+                      }}
+                      placeholder="Contraseña nueva"
+                      required
+                      autoComplete="new-password"
+                    />
+                    <button type="submit" className="primary-btn" disabled={atendiendo === solicitud.id}>
+                      {atendiendo === solicitud.id ? 'Guardando...' : 'Cambiar contraseña'}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => handleRechazar(solicitud)}
+                      disabled={atendiendo === solicitud.id}
+                    >
+                      Rechazar
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <div className="content-grid two-columns admin-grid">
         <div className="card">
           <div className="card-header">

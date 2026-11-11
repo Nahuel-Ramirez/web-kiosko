@@ -2,6 +2,7 @@
 from decimal import Decimal
 from typing import List, Optional
 from sqlalchemy import func, and_, case
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.security import hash_password
@@ -9,6 +10,7 @@ from app.models.cliente import Cliente
 from app.models.cierre_caja import CierreCaja
 from app.models.movimiento_fiado import MovimientoFiado
 from app.models.producto import Producto
+from app.models.solicitud_password import SolicitudPassword
 from app.models.usuario import Usuario
 from app.models.venta import Venta, DetalleVenta
 from app.schemas.core import (
@@ -90,6 +92,76 @@ def delete_usuario(db: Session, usuario_id: int) -> bool:
     db.delete(usuario)
     db.commit()
     return True
+
+
+# ===== PEDIDOS DE CONTRASEÑA =====
+def crear_solicitud_password(db: Session, username: str, motivo: str) -> None:
+    """Registra el pedido si el usuario existe y está activo. Si ya tiene uno pendiente no
+    se duplica. No avisa si el usuario no existe, para no revelar qué usuarios hay."""
+    usuario = get_usuario_by_username(db, username)
+    if not usuario or not usuario.activo:
+        return
+    pendiente = (
+        db.query(SolicitudPassword)
+        .filter(SolicitudPassword.usuario_id == usuario.id, SolicitudPassword.estado == "PENDIENTE")
+        .first()
+    )
+    if pendiente:
+        return
+    db.add(SolicitudPassword(usuario_id=usuario.id, motivo=motivo))
+    try:
+        db.commit()
+    except IntegrityError:
+        # Otro pedido del mismo usuario entró al mismo tiempo (índice único de pendientes).
+        db.rollback()
+
+
+def _solicitud_dict(solicitud: SolicitudPassword) -> dict:
+    return {
+        "id": solicitud.id,
+        "usuario_id": solicitud.usuario_id,
+        "nombre": solicitud.usuario.nombre,
+        "username": solicitud.usuario.username,
+        "rol": solicitud.usuario.rol,
+        "motivo": solicitud.motivo,
+        "estado": solicitud.estado,
+        "fecha_solicitud": solicitud.fecha_solicitud,
+        "fecha_atencion": solicitud.fecha_atencion,
+    }
+
+
+def get_solicitudes_password_pendientes(db: Session) -> List[dict]:
+    solicitudes = (
+        db.query(SolicitudPassword)
+        .options(joinedload(SolicitudPassword.usuario))
+        .filter(SolicitudPassword.estado == "PENDIENTE")
+        .order_by(SolicitudPassword.fecha_solicitud, SolicitudPassword.id)
+        .all()
+    )
+    return [_solicitud_dict(s) for s in solicitudes]
+
+
+def atender_solicitud_password(
+    db: Session, solicitud_id: int, admin: Usuario, password_nueva: Optional[str] = None
+) -> dict:
+    """Con password_nueva le cambia la contraseña al usuario (RESUELTA); sin ella, RECHAZADA."""
+    solicitud = (
+        db.query(SolicitudPassword).filter(SolicitudPassword.id == solicitud_id).with_for_update().first()
+    )
+    if not solicitud:
+        raise ReglaNegocioError("Pedido no encontrado", status_code=404)
+    if solicitud.estado != "PENDIENTE":
+        raise ReglaNegocioError("Este pedido ya fue atendido", status_code=409)
+    if password_nueva is not None:
+        solicitud.usuario.password_hash = hash_password(password_nueva)
+        solicitud.estado = "RESUELTA"
+    else:
+        solicitud.estado = "RECHAZADA"
+    solicitud.atendida_por = admin.id
+    solicitud.fecha_atencion = func.now()
+    db.commit()
+    db.refresh(solicitud)
+    return _solicitud_dict(solicitud)
 
 
 # ===== CLIENTES =====
@@ -249,7 +321,7 @@ def create_venta(db: Session, usuario_id: int, datos: VentaCreate) -> Venta:
         if not producto:
             raise ReglaNegocioError("El producto %s no existe" % producto_id)
         if not producto.activo:
-            raise ReglaNegocioError("'%s' esta dado de baja y no se puede vender" % producto.nombre)
+            raise ReglaNegocioError("'%s' está dado de baja y no se puede vender" % producto.nombre)
         if producto.stock_actual < cantidad:
             raise ReglaNegocioError(
                 "Stock insuficiente para '%s' (disponible: %s, pedido: %s)"
@@ -609,16 +681,16 @@ def get_saldo_fiado(db: Session, cliente_id: int) -> Decimal:
 
 def _validar_fiado(db: Session, cliente: Cliente, total: Decimal) -> None:
     if cliente.id == CONSUMIDOR_FINAL_ID:
-        raise ReglaNegocioError("No se puede fiar a Consumidor Final: elegi un cliente")
+        raise ReglaNegocioError("No se puede fiar a Consumidor Final: elegí un cliente")
     if not cliente.activo:
-        raise ReglaNegocioError("El cliente esta dado de baja y no puede llevar fiado")
+        raise ReglaNegocioError("El cliente está dado de baja y no puede llevar fiado")
     if total <= 0:
         raise ReglaNegocioError("Una venta fiada tiene que tener un total mayor a 0")
     saldo = get_saldo_fiado(db, cliente.id)
     limite = _dinero(cliente.limite_fiado)
     if saldo + total > limite:
         raise ReglaNegocioError(
-            "La venta supera el limite de fiado de %s (debe %s, limite %s, disponible %s)"
+            "La venta supera el límite de fiado de %s (debe %s, límite %s, disponible %s)"
             % (cliente.razon_social, saldo, limite, limite - saldo),
             status_code=409,
         )

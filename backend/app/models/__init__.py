@@ -9,3 +9,4 @@ from app.models.producto import Producto  # noqa: F401
 from app.models.cierre_caja import CierreCaja  # noqa: F401
 from app.models.venta import Venta, DetalleVenta  # noqa: F401
 from app.models.movimiento_fiado import MovimientoFiado  # noqa: F401
+from app.models.solicitud_password import SolicitudPassword  # noqa: F401

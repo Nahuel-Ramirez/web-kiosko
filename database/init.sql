@@ -195,6 +195,20 @@ ALTER TABLE movimientos_fiado ADD COLUMN IF NOT EXISTS cierre_id INT REFERENCES 
 ALTER TABLE movimientos_fiado DROP CONSTRAINT IF EXISTS movimientos_fiado_cierre_check;
 ALTER TABLE movimientos_fiado ADD CONSTRAINT movimientos_fiado_cierre_check CHECK (tipo = 'PAGO' OR cierre_id IS NULL);
 
+-- "¿Olvidó su contraseña?": como la app no manda mails, el usuario deja un pedido con el
+-- motivo y un administrador le pone una contraseña nueva (RESUELTA) o lo rechaza
+-- (RECHAZADA). Queda registrado quién lo atendió y cuándo, para auditoría.
+CREATE TABLE IF NOT EXISTS solicitudes_password (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    motivo TEXT NOT NULL CHECK (btrim(motivo) <> ''),
+    estado VARCHAR(10) NOT NULL DEFAULT 'PENDIENTE' CHECK (estado IN ('PENDIENTE', 'RESUELTA', 'RECHAZADA')),
+    fecha_solicitud TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atendida_por INT REFERENCES usuarios(id) ON DELETE SET NULL,
+    fecha_atencion TIMESTAMPTZ,
+    CONSTRAINT solicitudes_password_atencion_check CHECK ((estado = 'PENDIENTE') = (fecha_atencion IS NULL))
+);
+
 -- Fechas con zona horaria, igual que los modelos (DateTime(timezone=True)). Si la base
 -- ya existía con TIMESTAMP, convierte las fechas guardadas sin correrlas de hora.
 DO $$
@@ -262,6 +276,11 @@ CREATE INDEX IF NOT EXISTS idx_cierres_caja_fecha ON cierres_caja (fecha_cierre)
 CREATE INDEX IF NOT EXISTS idx_movimientos_fiado_cliente_fecha ON movimientos_fiado (cliente_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_movimientos_fiado_usuario ON movimientos_fiado (usuario_id);
 CREATE INDEX IF NOT EXISTS idx_movimientos_fiado_cierre ON movimientos_fiado (cierre_id);
+
+-- Un usuario tiene como mucho un pedido de contraseña pendiente: si vuelve a pedir, no se
+-- duplica.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitudes_password_pendiente
+    ON solicitudes_password (usuario_id) WHERE estado = 'PENDIENTE';
 
 -- Seed inicial: cliente "Consumidor Final". Va con id 1 fijo porque el backend y el
 -- POS lo usan como cliente por defecto (cliente_id = 1), y sin fiado.

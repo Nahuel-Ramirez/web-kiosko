@@ -28,12 +28,12 @@ export function LoginVisual() {
         <div className="brand-panel">
           <span className="eyebrow">Sistema de ventas</span>
           <h1>Web Kiosko</h1>
-          <p>Panel de administracion y punto de venta para kiosco y minimarket.</p>
+          <p>Panel de administración y punto de venta para kiosco y minimarket.</p>
         </div>
 
         <div className="login-card">
           <div>
-            <h2>Iniciar sesion</h2>
+            <h2>Iniciar sesión</h2>
             <div className="role-toggle">
               <button
                 className={`role-btn ${selectedRole === 'admin' ? 'active' : ''}`}
@@ -67,7 +67,7 @@ export function LoginVisual() {
                 />
               </label>
               <label>
-                Contrasena
+                Contraseña
                 <input
                   type="password"
                   id="password"
@@ -81,7 +81,7 @@ export function LoginVisual() {
             </form>
 
             <div className="demo-box">
-              <strong>Demo rapida</strong>
+              <strong>Demo rápida</strong>
               <span>Admin: admin / 1234</span>
               <span>Cajero: cajero / 1234</span>
             </div>

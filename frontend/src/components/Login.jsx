@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
-import { API_URL } from '../services/api';
+import { solicitarCambioPassword } from '../services/authService';
 
 const USUARIOS_DEMO = {
   admin: { username: 'admin', password: 'admin123' },
@@ -58,24 +58,10 @@ export function Login() {
 
     setResetLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: resetUsername.trim(),
-          justificacion: justificacion.trim(),
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'Error al solicitar reset');
-      }
-
-      setResetSuccess('Solicitud enviada. El administrador revisará la justificación y le informará la nueva contraseña.');
+      setResetSuccess(await solicitarCambioPassword(resetUsername.trim(), justificacion.trim()));
       setResetForm({ username: '', justificacion: '' });
     } catch (err) {
-      setResetError(err.message);
+      setResetError(err.message || 'No se pudo enviar la solicitud.');
     } finally {
       setResetLoading(false);
     }
@@ -87,12 +73,12 @@ export function Login() {
         <div className="brand-panel">
           <span className="eyebrow">Sistema de ventas</span>
           <h1>Web Kiosko</h1>
-          <p>Panel de administracion y punto de venta para kiosco y minimarket.</p>
+          <p>Panel de administración y punto de venta para kiosco y minimarket.</p>
         </div>
 
         <div className="login-card">
           <div>
-            <h2>Iniciar sesion</h2>
+            <h2>Iniciar sesión</h2>
             <div className="role-toggle">
               <button
                 type="button"
@@ -126,7 +112,7 @@ export function Login() {
                 />
               </label>
               <label>
-                Contrasena
+                Contraseña
                 <input
                   type="password"
                   id="password"
@@ -141,9 +127,9 @@ export function Login() {
               </button>
             </form>
 
-            <p className="reset-link" onClick={openResetModal}>
+            <button type="button" className="reset-link" onClick={openResetModal}>
               ¿Olvidó su contraseña?
-            </p>
+            </button>
 
             <div className="demo-box">
               <strong>Usuarios de prueba (backend)</strong>
@@ -160,45 +146,56 @@ export function Login() {
                 <h3>Recuperar contraseña</h3>
                 <button className="modal-close" onClick={() => setShowResetModal(false)} aria-label="Cerrar">×</button>
               </div>
-              <form onSubmit={handleResetSubmit}>
-                {resetError && <div className="form-message error">{resetError}</div>}
-                {resetSuccess && <div className="form-message success">{resetSuccess}</div>}
-
-                <div className="form-field">
-                  <label htmlFor="resetUsername">Usuario <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    id="resetUsername"
-                    value={resetForm.username}
-                    onChange={e => setResetForm(prev => ({ ...prev, username: e.target.value }))}
-                    placeholder="Su nombre de usuario"
-                    required
-                    autoComplete="username"
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="justificacion">Justificación / Motivo <span className="required">*</span></label>
-                  <textarea
-                    id="justificacion"
-                    value={resetForm.justificacion}
-                    onChange={e => setResetForm(prev => ({ ...prev, justificacion: e.target.value }))}
-                    placeholder="Explique el motivo de la solicitud (obligatorio para auditoría)"
-                    required
-                    rows={3}
-                    style={{ width: '100%', padding: '0.85rem 1rem', border: '1px solid var(--line)', borderRadius: '10px', fontFamily: 'inherit', fontSize: '0.95rem' }}
-                  />
-                </div>
-
-                <div className="form-actions">
-                  <button type="button" className="secondary-btn full" onClick={() => setShowResetModal(false)}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="primary-btn full" disabled={resetLoading}>
-                    {resetLoading ? 'Enviando...' : 'Solicitar reset'}
+              {resetSuccess ? (
+                <div className="reset-form">
+                  <div className="form-message success" role="status">{resetSuccess}</div>
+                  <button type="button" className="primary-btn full" onClick={() => setShowResetModal(false)}>
+                    Cerrar
                   </button>
                 </div>
-              </form>
+              ) : (
+                <form className="reset-form" onSubmit={handleResetSubmit}>
+                  <p className="reset-help">
+                    Un administrador va a revisar el pedido y le va a informar la nueva contraseña.
+                  </p>
+                  {resetError && <div className="form-message error" role="alert">{resetError}</div>}
+
+                  <div className="form-field">
+                    <label htmlFor="resetUsername">Usuario <span className="required">*</span></label>
+                    <input
+                      type="text"
+                      id="resetUsername"
+                      value={resetForm.username}
+                      onChange={e => setResetForm(prev => ({ ...prev, username: e.target.value }))}
+                      placeholder="Su usuario (los cajeros usan su DNI)"
+                      required
+                      autoComplete="username"
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label htmlFor="justificacion">Justificación / Motivo <span className="required">*</span></label>
+                    <textarea
+                      id="justificacion"
+                      value={resetForm.justificacion}
+                      onChange={e => setResetForm(prev => ({ ...prev, justificacion: e.target.value }))}
+                      placeholder="Explique el motivo de la solicitud (obligatorio para auditoría)"
+                      required
+                      rows={3}
+                      maxLength={500}
+                    />
+                  </div>
+
+                  <div className="form-actions">
+                    <button type="button" className="secondary-btn full" onClick={() => setShowResetModal(false)}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="primary-btn full" disabled={resetLoading}>
+                      {resetLoading ? 'Enviando...' : 'Enviar solicitud'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}

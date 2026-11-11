@@ -116,7 +116,7 @@ def ver_cierre(
 
     # Cajero solo ve sus propios cierres
     if usuario.rol != "ADMIN" and resumen.cierre.usuario_id != usuario.id:
-        raise HTTPException(status_code=403, detail="No puedes ver cierres de otros usuarios")
+        raise HTTPException(status_code=403, detail="No podés ver cierres de otros usuarios")
 
     return resumen
 

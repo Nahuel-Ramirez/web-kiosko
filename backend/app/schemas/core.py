@@ -13,7 +13,7 @@ def normalizar_dni_cuit(valor: str) -> str:
     7 u 8 digitos para un DNI, 11 para un CUIT/CUIL.'''
     limpio = re.sub(r'[\s.\-]', '', valor or '')
     if not re.fullmatch(r'[0-9]{7,8}|[0-9]{11}', limpio):
-        raise ValueError('DNI/CUIT invalido: solo numeros, 7 u 8 digitos para DNI u 11 para CUIT/CUIL')
+        raise ValueError('DNI/CUIT inválido: solo números, 7 u 8 dígitos para DNI u 11 para CUIT/CUIL')
     return limpio
 
 
@@ -30,7 +30,7 @@ class UsuarioBase(BaseModel):
     def validar_rol(cls, valor: str) -> str:
         valor = valor.strip().upper()
         if valor not in ROLES_VALIDOS:
-            raise ValueError(f'rol invalido. Debe ser uno de {sorted(ROLES_VALIDOS)}')
+            raise ValueError(f'rol inválido. Debe ser uno de {sorted(ROLES_VALIDOS)}')
         return valor
 
 
@@ -53,7 +53,7 @@ class UsuarioUpdate(BaseModel):
             return valor
         valor = valor.strip().upper()
         if valor not in ROLES_VALIDOS:
-            raise ValueError(f'rol invalido. Debe ser uno de {sorted(ROLES_VALIDOS)}')
+            raise ValueError(f'rol inválido. Debe ser uno de {sorted(ROLES_VALIDOS)}')
         return valor
 
 
@@ -61,6 +61,53 @@ class UsuarioOut(UsuarioBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+
+
+# ===== PEDIDOS DE CONTRASEÑA ("¿Olvidó su contraseña?") =====
+class SolicitudPasswordCreate(BaseModel):
+    username: str
+    justificacion: str
+
+    @field_validator('username', 'justificacion')
+    @classmethod
+    def no_vacio(cls, valor: str) -> str:
+        valor = valor.strip()
+        if not valor:
+            raise ValueError('El usuario y el motivo son obligatorios')
+        return valor
+
+    @field_validator('justificacion')
+    @classmethod
+    def largo_motivo(cls, valor: str) -> str:
+        if len(valor) > 500:
+            raise ValueError('El motivo puede tener hasta 500 caracteres')
+        return valor
+
+
+class SolicitudPasswordOut(BaseModel):
+    id: int
+    usuario_id: int
+    nombre: str
+    username: str
+    rol: str
+    motivo: str
+    estado: str
+    fecha_solicitud: datetime
+    fecha_atencion: Optional[datetime] = None
+
+
+class ResolverSolicitudPassword(BaseModel):
+    password_nueva: str
+
+    @field_validator('password_nueva')
+    @classmethod
+    def validar_password(cls, valor: str) -> str:
+        # El login recorta los espacios de los costados: una clave así no se podría usar.
+        if valor != valor.strip():
+            raise ValueError('La contraseña no puede empezar ni terminar con espacios')
+        if len(valor) < 4:
+            raise ValueError('La contraseña debe tener al menos 4 caracteres')
+        return valor
 
 
 # ===== CLIENTES =====
@@ -90,7 +137,7 @@ class ClienteCreate(ClienteBase):
         if self.nombre and self.apellido:
             self.razon_social = '%s %s' % (self.apellido.strip(), self.nombre.strip())
         if not self.razon_social or not self.razon_social.strip():
-            raise ValueError('Indicar razon_social, o nombre y apellido')
+            raise ValueError('Indicar la razón social, o el nombre y el apellido')
         return self
 
 
@@ -184,7 +231,7 @@ class VentaBase(BaseModel):
         # (database/init.sql) y con las comparaciones de los reportes.
         valor = valor.strip().upper()
         if valor not in METODOS_PAGO_VALIDOS:
-            raise ValueError(f'metodo_pago invalido. Debe ser uno de {sorted(METODOS_PAGO_VALIDOS)}')
+            raise ValueError(f'metodo_pago inválido. Debe ser uno de {sorted(METODOS_PAGO_VALIDOS)}')
         return valor
 
 

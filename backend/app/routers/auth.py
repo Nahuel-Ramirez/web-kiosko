@@ -5,9 +5,16 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.usuario import Usuario
 from app.schemas.auth import LoginRequest, TokenResponse, UsuarioOut
+from app.schemas.core import SolicitudPasswordCreate
 from app.services.auth_service import authenticate_user, generar_token_para_usuario
+from app.services.core_service import crear_solicitud_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+MENSAJE_SOLICITUD = (
+    "Solicitud enviada. Si el usuario existe, un administrador la va a revisar "
+    "y le va a informar la nueva contraseña."
+)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -37,3 +44,12 @@ def me(usuario: Usuario = Depends(get_current_user)):
     """Devuelve los datos del usuario logueado según su JWT.
     Útil para que el frontend sepa el rol sin decodificar el token él mismo."""
     return usuario
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+def olvide_password(datos: SolicitudPasswordCreate, db: Session = Depends(get_db)):
+    """Pedido de "¿Olvidó su contraseña?": queda para que un administrador le ponga una
+    contraseña nueva (en Cajeros). Responde lo mismo exista o no el usuario, para no
+    revelar qué usuarios hay."""
+    crear_solicitud_password(db, datos.username, datos.justificacion)
+    return {"detail": MENSAJE_SOLICITUD}

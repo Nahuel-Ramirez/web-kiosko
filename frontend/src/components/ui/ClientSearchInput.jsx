@@ -13,7 +13,7 @@ const campoStyle = {
 };
 
 // La regla global de label en index.css es para el login (texto blanco); acá el fondo es claro.
-const labelStyle = { color: 'var(--text)', fontWeight: 600, fontSize: '0.85rem' };
+const labelStyle = { display: 'block', color: 'var(--text)', fontWeight: 600, fontSize: '0.85rem' };
 
 export function ClientSearchInput({ onSelect, placeholder = 'Buscar cliente por CUIL/DNI...', initialClient = null }) {
   const [query, setQuery] = useState(initialClient ? '' : '');
