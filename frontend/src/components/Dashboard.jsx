@@ -64,6 +64,7 @@ export function Dashboard() {
 
   const nombrePorId = Object.fromEntries(products.map(p => [p.id, p.name]));
   const lowStockProducts = getLowStockProducts();
+
   const recentSales = ventasHoy.slice(0, 4).map(venta => ({
     id: venta.id,
     items: venta.detalles
@@ -74,9 +75,10 @@ export function Dashboard() {
     time: new Date(venta.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
   }));
 
+  const stockCriticoCount = products.filter(p => p.stock < 50 && p.stock > 0).length;
   const stats = [
     { label: 'Productos', value: products.length.toString() },
-    { label: 'Stock crítico', value: lowStockProducts.length.toString() },
+    { label: 'Stock crítico', value: stockCriticoCount.toString() },
     { label: 'Ventas del día', value: resumenHoy.cantidad.toString() },
     { label: 'Facturación', value: formatMoney(resumenHoy.total) }
   ];
@@ -96,17 +98,17 @@ export function Dashboard() {
         <div className="recomendaciones-section">
           <h4 className="chart-title">Recomendaciones Inteligentes</h4>
           <div className="recomendaciones-grid scroll-y">
-            {recomendaciones.map((rec, index) => (
-              <div key={index} className={`recomendacion-card ${rec.tipo}`}>
-                <div className="recomendacion-icon">
-                  {rec.tipo === 'cajero' ? '👥' : '📦'}
+            {recomendaciones
+              .filter(rec => rec.tipo === 'cajero')
+              .map((rec, index) => (
+                <div key={index} className={`recomendacion-card ${rec.tipo}`}>
+                  <div className="recomendacion-icon">👥</div>
+                  <div className="recomendacion-content">
+                    <strong>Refuerzo de Cajeros</strong>
+                    <p>{rec.mensaje}</p>
+                  </div>
                 </div>
-                <div className="recomendacion-content">
-                  <strong>{rec.tipo === 'cajero' ? 'Refuerzo de Cajeros' : 'Alerta de Stock'}</strong>
-                  <p>{rec.mensaje}</p>
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       )}

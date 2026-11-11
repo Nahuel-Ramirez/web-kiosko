@@ -110,10 +110,10 @@ export function AppProvider({ children }) {
     }).format(value);
   }, []);
 
-  // Alerta de stock: el producto llegó a su stock mínimo (o se quedó sin stock).
+  // Alerta de stock: productos bajo (stock < 100) o crítico (stock < 50).
   const getLowStockProducts = useCallback(() => {
     return products
-      .filter((product) => product.stock <= product.minStock)
+      .filter((product) => product.stock < 100)
       .sort((a, b) => a.stock - b.stock);
   }, [products]);
 
